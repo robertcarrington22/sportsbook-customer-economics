@@ -3,3 +3,5 @@ __pycache__/
 data/
 outputs/features.parquet
 run.log
+tabpfn.log
+tabpfn.err

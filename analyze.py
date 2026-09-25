@@ -51,6 +51,51 @@ def main() -> None:
         print(f"\n== {path.name}  ({len(df):,} rows)")
         print(df.head(12).to_string(index=False))
     con.execute(f"COPY features TO '{(OUT / 'features.parquet').as_posix()}' (FORMAT PARQUET)")
+    bootstrap_channel_ci(con)
+
+
+def bootstrap_channel_ci(con: duckdb.DuckDBPyConnection, n_boot: int = 2000, seed: int = 7) -> None:
+    """95% bootstrap intervals for 12-month LTV and LTV/CAC by channel.
+
+    Resamples players within each channel. Value is heavy-tailed, so a few
+    whales can move a channel's average a lot; the interval shows how much.
+    """
+    import numpy as np
+    import pandas as pd
+
+    pp = con.execute(
+        """
+        SELECT player_id, channel, any_value(cac) AS cac, sum(contribution) AS c12
+        FROM player_month
+        WHERE last_full_month >= 11 AND life_month <= 11
+        GROUP BY player_id, channel
+        ORDER BY player_id
+        """
+    ).df()
+    rng = np.random.default_rng(seed)
+    rows = []
+    for channel, g in pp.groupby("channel"):
+        c12, cac = g["c12"].to_numpy(), g["cac"].to_numpy()
+        idx = rng.integers(0, len(g), size=(n_boot, len(g)))
+        ltv = c12[idx].mean(axis=1)
+        ratio = ltv / cac[idx].mean(axis=1)
+        rows.append(
+            {
+                "channel": channel,
+                "ftds": len(g),
+                "ltv_12m": round(float(c12.mean()), 0),
+                "ltv_lo": round(float(np.quantile(ltv, 0.025)), 0),
+                "ltv_hi": round(float(np.quantile(ltv, 0.975)), 0),
+                "ratio": round(float(c12.mean() / cac.mean()), 2),
+                "ratio_lo": round(float(np.quantile(ratio, 0.025)), 2),
+                "ratio_hi": round(float(np.quantile(ratio, 0.975)), 2),
+                "p_ratio_below_1": round(float((ratio < 1).mean()), 3),
+            }
+        )
+    df = pd.DataFrame(rows).sort_values("ratio", ascending=False)
+    df.to_csv(OUT / "16_channel_bootstrap.csv", index=False)
+    print("\n== bootstrap: 12-month LTV / CAC, 95% interval")
+    print(df.to_string(index=False))
 
 
 if __name__ == "__main__":

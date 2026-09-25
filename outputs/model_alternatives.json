@@ -1,0 +1,35 @@
+{
+  "n_context": 3000,
+  "n_test": 6754,
+  "n_estimators": 4,
+  "models": [
+    {
+      "name": "TabPFN v2, 3,000 players",
+      "auc": 0.745,
+      "spearman": 0.591,
+      "mae": 367.98,
+      "top_decile_lift": 10.25,
+      "hidden_high_value_share_top_decile": 0.688
+    },
+    {
+      "name": "Gradient boosting, 3,000 players",
+      "auc": 0.726,
+      "spearman": 0.549,
+      "mae": 385.05,
+      "top_decile_lift": 10.15,
+      "hidden_high_value_share_top_decile": 0.645
+    },
+    {
+      "name": "Gradient boosting, 33,246 players",
+      "auc": 0.753,
+      "spearman": 0.519,
+      "mae": 379.11,
+      "top_decile_lift": 10.17,
+      "hidden_high_value_share_top_decile": 0.716
+    }
+  ],
+  "baseline_handle_only": {
+    "spearman": 0.367,
+    "top_decile_lift": 10.07
+  }
+}

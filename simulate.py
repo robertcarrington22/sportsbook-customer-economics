@@ -91,6 +91,11 @@ def main() -> None:
     alive = np.minimum(lifetime, obs_days)
 
     act_season = np.array([sim["activity_seasonality"][str(m)] for m in range(1, 13)])
+
+    # One hold shock per calendar month, shared by every player (same games, same results).
+    first_month = np.datetime64(start.date(), "M")
+    n_months = int((np.datetime64(obs_end.date(), "M") - first_month).astype(int)) + 1
+    market_shock = rng.normal(0, cfg["economics"]["market_hold_sd"], n_months)
     hold = 1 - tp["win_prob"] * tp["decimal_odds"]
     if (hold <= 0).any():
         raise ValueError("Every player type needs win_prob * decimal_odds < 1 (positive hold).")
@@ -115,6 +120,8 @@ def main() -> None:
         handle = bets * stake
         wins = rng.binomial(bets, tp["win_prob"][t])
         ggr = handle - wins * stake * tp["decimal_odds"][t]
+        month_idx = (dates.astype("datetime64[M]") - first_month).astype(int)
+        ggr = ggr + handle * market_shock[month_idx]
         reinvest = tp["reinvest_pct"][t] * handle * hold[t]
         frames.append(
             pd.DataFrame(
