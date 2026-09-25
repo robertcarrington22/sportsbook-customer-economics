@@ -20,6 +20,7 @@ Prior Labs License 1.1 (Apache 2.0 with attribution). Built with TabPFN.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sys
@@ -63,16 +64,27 @@ def main() -> None:
 
     X_ctx, X_te = encode(ctx), encode(test)
     y_ctx, y_te = ctx["active_m3"].to_numpy(), test["active_m3"].to_numpy()
-    v_ctx, v_te = ctx["contribution_180"].to_numpy(), test["contribution_180"].to_numpy()
+    # Value target: theoretical contribution, the same target as model.py.
+    v_ctx, v_te = ctx["theo_contribution_180"].to_numpy(), test["theo_contribution_180"].to_numpy()
     cat_idx = list(range(len(CATS)))
 
     # ---- TabPFN ----------------------------------------------------------
     # Predictions are cached: TabPFN takes ~15 minutes on CPU, the baselines take seconds.
-    cache = OUT / "tabpfn_predictions.parquet"
-    if cache.exists() and "--refresh" not in sys.argv:
+    # The cache is keyed on a fingerprint of every input, so any change to the data,
+    # features, or targets triggers a fresh run instead of silently reusing stale predictions.
+    cache, key_file = OUT / "tabpfn_predictions.parquet", OUT / "tabpfn_predictions.key"
+    # Rounded to 6 decimals: DuckDB's parallel sums differ in the last bits (~1e-11) from run to
+    # run, which is noise, not a change in the data.
+    fingerprint = hashlib.sha256(
+        b"".join(np.round(np.asarray(x, dtype=float), 6).tobytes() for x in (X_ctx, y_ctx, v_ctx, X_te))
+    ).hexdigest()
+    fresh = cache.exists() and key_file.exists() and key_file.read_text().strip() == fingerprint
+    if "--adopt-cache" in sys.argv and cache.exists():
+        key_file.write_text(fingerprint)  # inputs verified equal to the cached run's, within float noise
+        fresh = True
+    if fresh and "--refresh" not in sys.argv:
         cached = pd.read_parquet(cache)
-        assert cached["player_id"].tolist() == test["player_id"].tolist(), "test set changed; run with --refresh"
-        p_pfn, v_pfn = cached["p_active_m3"].to_numpy(), cached["contribution_180_hat"].to_numpy()
+        p_pfn, v_pfn = cached["p_active_m3"].to_numpy(), cached["value_hat"].to_numpy()
         print("using cached TabPFN predictions")
     else:
         clf = TabPFNClassifier.create_default_for_version(
@@ -87,7 +99,8 @@ def main() -> None:
         )
         reg.fit(X_ctx, v_ctx)
         v_pfn = predict_batched(reg.predict, X_te, "TabPFN value")
-        pd.DataFrame({"player_id": test["player_id"], "p_active_m3": p_pfn, "contribution_180_hat": v_pfn}).to_parquet(cache)
+        pd.DataFrame({"player_id": test["player_id"], "p_active_m3": p_pfn, "value_hat": v_pfn}).to_parquet(cache)
+        key_file.write_text(fingerprint)
 
     # ---- Gradient boosting on the same 3,000 players ---------------------
     gb_c = fit_xgb("clf", ctx[CATS + NUMS], y_ctx)
@@ -105,6 +118,8 @@ def main() -> None:
         top = pred >= np.quantile(pred, 0.9)
         return {
             "spearman": round(float(spearmanr(pred, v_te).statistic), 3),
+            "top_ratio": round(float(pred[top].mean() / v_te[top].mean()), 3),
+            "mean_predicted": round(float(pred.mean()), 2),
             "mae": round(float(mean_absolute_error(v_te, pred)), 2),
             "top_decile_lift": top_decile(pred, v_te)["lift"],
             "hidden_high_value_share_top_decile": round(float((ttype[top] == "high_value").mean()), 3),
@@ -120,12 +135,23 @@ def main() -> None:
             {
                 "name": f"XGBoost, {full['split']['n_train']:,} players",
                 "auc": full["retention"]["auc_gbm"],
-                "spearman": full["value"]["spearman_model"],
-                "mae": full["value"]["mae_model"],
-                "top_decile_lift": full["value"]["top_decile_model"]["lift"],
-                "hidden_high_value_share_top_decile": full["value"]["hidden_high_value_share_top_decile"],
+                "spearman": full["value_squared_error"]["spearman_model"],
+                "top_ratio": round(full["value_squared_error"]["deciles"][0]["predicted"]
+                                   / full["value_squared_error"]["deciles"][0]["actual"], 3),
+                "mean_predicted": full["value_squared_error"]["mean_predicted"],
+                "mae": full["value_squared_error"]["mae_model"],
+                "top_decile_lift": full["value_squared_error"]["top_decile_model"]["lift"],
+                "hidden_high_value_share_top_decile": full["value_squared_error"]["hidden_high_value_share_top_decile"],
             },
         ],
+        "two_part_full": {
+            "name": f"Two-part XGBoost, {full['split']['n_train']:,} players",
+            "spearman": full["value"]["spearman_model"],
+            "top_ratio": round(full["value"]["deciles"][0]["predicted"] / full["value"]["deciles"][0]["actual"], 3),
+            "mae": full["value"]["mae_model"],
+        },
+        "value_target": "theoretical contribution, days 0 to 179",
+        "mean_actual": round(float(v_te.mean()), 2),
         "baseline_handle_only": {
             "spearman": full["value"]["spearman_heuristic"],
             "top_decile_lift": full["value"]["top_decile_heuristic"]["lift"],

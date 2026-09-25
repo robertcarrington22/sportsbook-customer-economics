@@ -5,31 +5,45 @@
   "models": [
     {
       "name": "TabPFN v2, 3,000 players",
-      "auc": 0.745,
-      "spearman": 0.591,
-      "mae": 367.98,
-      "top_decile_lift": 10.25,
-      "hidden_high_value_share_top_decile": 0.688
+      "auc": 0.751,
+      "spearman": 0.886,
+      "top_ratio": 0.596,
+      "mean_predicted": 117.73,
+      "mae": 174.23,
+      "top_decile_lift": 10.29,
+      "hidden_high_value_share_top_decile": 0.712
     },
     {
       "name": "XGBoost, 3,000 players",
-      "auc": 0.73,
-      "spearman": 0.56,
-      "mae": 388.27,
-      "top_decile_lift": 9.94,
-      "hidden_high_value_share_top_decile": 0.651
+      "auc": 0.738,
+      "spearman": 0.869,
+      "top_ratio": 0.803,
+      "mean_predicted": 169.85,
+      "mae": 165.47,
+      "top_decile_lift": 10.29,
+      "hidden_high_value_share_top_decile": 0.716
     },
     {
       "name": "XGBoost, 33,246 players",
-      "auc": 0.753,
-      "spearman": 0.572,
-      "mae": 378.65,
-      "top_decile_lift": 10.2,
-      "hidden_high_value_share_top_decile": 0.72
+      "auc": 0.754,
+      "spearman": 0.872,
+      "top_ratio": 0.928,
+      "mean_predicted": 202.88,
+      "mae": 154.42,
+      "top_decile_lift": 10.33,
+      "hidden_high_value_share_top_decile": 0.723
     }
   ],
+  "two_part_full": {
+    "name": "Two-part XGBoost, 33,246 players",
+    "spearman": 0.886,
+    "top_ratio": 1.051,
+    "mae": 151.86
+  },
+  "value_target": "theoretical contribution, days 0 to 179",
+  "mean_actual": 229.35,
   "baseline_handle_only": {
-    "spearman": 0.367,
-    "top_decile_lift": 10.07
+    "spearman": 0.687,
+    "top_decile_lift": 10.3
   }
 }

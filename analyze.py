@@ -30,7 +30,12 @@ def connect() -> duckdb.DuckDBPyConnection:
     con = duckdb.connect()
     con.execute(f"CREATE VIEW players AS SELECT * FROM read_parquet('{(DATA / 'players.parquet').as_posix()}')")
     con.execute(f"CREATE VIEW activity AS SELECT * FROM read_parquet('{(DATA / 'activity.parquet').as_posix()}')")
+    con.execute(f"CREATE VIEW bets AS SELECT * FROM read_parquet('{(DATA / 'bets.parquet').as_posix()}')")
     con.execute(f"CREATE VIEW states AS SELECT * FROM read_csv_auto('{(DATA / 'states.csv').as_posix()}')")
+    con.execute(
+        "CREATE VIEW seasonality AS SELECT * FROM "
+        f"read_csv_auto('{(ROOT / 'real_data' / 'ny_seasonality.csv').as_posix()}')"
+    )
     con.execute(
         "CREATE TABLE params AS SELECT "
         f"DATE '{cfg['simulation']['observation_end']}' AS observation_end, "

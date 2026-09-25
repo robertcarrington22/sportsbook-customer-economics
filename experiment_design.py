@@ -78,6 +78,16 @@ def main() -> None:
                            "winsor_adjusted": n_per_arm(sd_adj, observed_gap)},
         "table": [{"mde": m, "raw": n_per_arm(sd, m), "winsor": n_per_arm(sd_w, m),
                    "winsor_adjusted": n_per_arm(sd_adj, m)} for m in MDES],
+        # Measuring the test on theoretical contribution removes bet-outcome luck from the outcome.
+        # It is still a post-randomization outcome, and it still reflects any change in how much
+        # or what people bet, so it measures the same behavioral effect with less noise.
+        "theo": (lambda yt, gap: {
+            "sd": round(float(yt.std()), 2), "sd_winsor": round(float(winsor(yt).std()), 2),
+            "gap": round(gap, 2),
+            "n_raw": n_per_arm(float(yt.std()), gap), "n_winsor": n_per_arm(float(winsor(yt).std()), gap),
+        })(feats["theo_contribution_180"].to_numpy(float),
+           float(feats.groupby("offer")["theo_contribution_180"].mean()["no_sweat_1000"]
+                 - feats.groupby("offer")["theo_contribution_180"].mean()["bet5_get200"])),
         "ftds_per_month_all_channels": int(round(len(feats) / 12)),
         "ftds_per_month_paid_social": int(round((feats.channel == "paid_social").sum() / 12)),
     }

@@ -1,0 +1,11 @@
+cut,band,ftds,avg_handle_14,active_m3_rate,mean_contribution_180,offseason_active_rate_fall_signups
+Football share of handle,1  football-heavy (80%+),7158,93.0,0.437,-45.0,0.345
+Football share of handle,2  mixed (40% to 80%),10798,833.0,0.622,266.0,0.533
+Football share of handle,3  mostly other sports,22044,814.0,0.56,280.0,0.499
+Parlay share of handle,1  under 25%,12046,755.0,0.452,173.0,0.363
+Parlay share of handle,2  25% to 50%,10537,1337.0,0.694,525.0,0.588
+Parlay share of handle,3  50% to 75%,7282,500.0,0.638,189.0,0.545
+Parlay share of handle,4  75% and up,10135,78.0,0.472,-26.0,0.397
+Sports bet in first 14 days,1  one sport,7898,28.0,0.349,-68.0,0.283
+Sports bet in first 14 days,2  two sports,9988,68.0,0.414,-47.0,0.326
+Sports bet in first 14 days,3  three or more,22114,1208.0,0.692,440.0,0.584

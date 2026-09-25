@@ -6,8 +6,9 @@ Model, per acquisition channel:
     parameters, fit by least squares to the observed monthly active rates.
     The sBG allows for heterogeneous churn across players, which gives the
     long, slowly decaying tail that a single churn rate cannot.
-  - Value: contribution per active player, held at its average over the last
-    three fitted months.
+  - Value: theoretical contribution per active player (expected rather than
+    realized GGR, so bet-outcome luck in the fit window does not carry into the
+    projection), held at its average over the last three fitted months.
   - Projected contribution in month t = S(t) x value per active player.
 
 Backtests, on data the fit never saw:
@@ -44,7 +45,7 @@ def load_panel(min_months: int) -> dict[str, dict]:
         con.execute(stmt)
     df = con.execute(f"""
         SELECT player_id, channel, cac, life_month,
-               CAST(active_days > 0 AS INTEGER) AS active, contribution
+               CAST(active_days > 0 AS INTEGER) AS active, theo_contribution AS contribution
         FROM player_month
         WHERE last_full_month >= {min_months - 1} AND life_month < {min_months}
         ORDER BY player_id, life_month

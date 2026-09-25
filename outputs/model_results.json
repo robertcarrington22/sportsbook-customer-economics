@@ -7,190 +7,201 @@
     "n_test": 6754
   },
   "retention": {
-    "base_rate_active_m3": 0.539,
-    "auc_logistic": 0.755,
-    "auc_gbm": 0.753,
-    "avg_precision_gbm": 0.786,
+    "base_rate_active_m3": 0.546,
+    "auc_logistic": 0.752,
+    "auc_gbm": 0.754,
+    "avg_precision_gbm": 0.784,
     "lapse_rate_bottom_decile": 0.76,
-    "lapse_rate_all": 0.461,
+    "lapse_rate_all": 0.454,
     "deciles": [
       {
         "decile": 1,
-        "predicted": 0.88,
+        "predicted": 0.9,
         "actual": 0.91,
         "n": 676
       },
       {
         "decile": 2,
-        "predicted": 0.81,
-        "actual": 0.83,
+        "predicted": 0.84,
+        "actual": 0.84,
         "n": 675
       },
       {
         "decile": 3,
-        "predicted": 0.71,
-        "actual": 0.77,
+        "predicted": 0.74,
+        "actual": 0.79,
         "n": 675
       },
       {
         "decile": 4,
-        "predicted": 0.58,
-        "actual": 0.62,
+        "predicted": 0.61,
+        "actual": 0.61,
         "n": 676
       },
       {
         "decile": 5,
-        "predicted": 0.5,
-        "actual": 0.49,
+        "predicted": 0.52,
+        "actual": 0.52,
         "n": 675
       },
       {
         "decile": 6,
-        "predicted": 0.44,
-        "actual": 0.43,
+        "predicted": 0.46,
+        "actual": 0.46,
         "n": 675
       },
       {
         "decile": 7,
         "predicted": 0.41,
-        "actual": 0.41,
+        "actual": 0.42,
         "n": 676
       },
       {
         "decile": 8,
-        "predicted": 0.38,
-        "actual": 0.37,
+        "predicted": 0.37,
+        "actual": 0.39,
         "n": 675
       },
       {
         "decile": 9,
-        "predicted": 0.34,
-        "actual": 0.3,
+        "predicted": 0.31,
+        "actual": 0.28,
         "n": 675
       },
       {
         "decile": 10,
-        "predicted": 0.28,
+        "predicted": 0.22,
         "actual": 0.24,
         "n": 676
       }
     ]
   },
   "value": {
-    "mean_actual": 283.41,
-    "mae_model": 378.65,
-    "mae_predict_mean": 690.19,
-    "spearman_model": 0.572,
-    "spearman_heuristic": 0.367,
+    "target": "theoretical contribution, days 0 to 179",
+    "model": "two-part XGBoost",
+    "mean_actual": 229.35,
+    "mean_predicted": 235.97,
+    "mae_model": 151.86,
+    "mae_predict_mean": 478.29,
+    "spearman_model": 0.886,
+    "spearman_heuristic": 0.687,
     "top_decile_model": {
-      "mean_top_decile": 2889.5,
-      "mean_all": 283.41,
-      "lift": 10.2,
-      "share_of_total": 1.02
+      "mean_top_decile": 2364.7,
+      "mean_all": 229.35,
+      "lift": 10.31,
+      "share_of_total": 1.032
     },
     "top_decile_heuristic": {
-      "mean_top_decile": 2854.43,
-      "mean_all": 283.41,
-      "lift": 10.07,
-      "share_of_total": 1.008
+      "mean_top_decile": 2362.94,
+      "mean_all": 229.35,
+      "lift": 10.3,
+      "share_of_total": 1.031
     },
     "deciles": [
       {
         "decile": 1,
-        "predicted": 2146.82,
-        "actual": 2889.5,
+        "predicted": 2484.18,
+        "actual": 2364.7,
         "n": 676
       },
       {
         "decile": 2,
-        "predicted": 237.67,
-        "actual": 282.92,
+        "predicted": 245.95,
+        "actual": 276.15,
         "n": 675
       },
       {
         "decile": 3,
-        "predicted": 67.47,
-        "actual": 120.24,
+        "predicted": 54.55,
+        "actual": 68.27,
         "n": 675
       },
       {
         "decile": 4,
-        "predicted": 12.72,
-        "actual": -11.68,
+        "predicted": -1.02,
+        "actual": 1.52,
         "n": 676
       },
       {
         "decile": 5,
-        "predicted": -12.97,
-        "actual": -35.16,
+        "predicted": -24.43,
+        "actual": -24.53,
         "n": 675
       },
       {
         "decile": 6,
-        "predicted": -22.2,
-        "actual": -50.36,
+        "predicted": -39.07,
+        "actual": -38.21,
         "n": 675
       },
       {
         "decile": 7,
-        "predicted": -25.54,
-        "actual": -57.3,
+        "predicted": -54.06,
+        "actual": -52.61,
         "n": 676
       },
       {
         "decile": 8,
-        "predicted": -36.37,
-        "actual": -83.6,
+        "predicted": -71.24,
+        "actual": -70.13,
         "n": 675
       },
       {
         "decile": 9,
-        "predicted": -51.76,
-        "actual": -95.11,
+        "predicted": -93.12,
+        "actual": -92.73,
         "n": 675
       },
       {
         "decile": 10,
-        "predicted": -74.16,
-        "actual": -127.65,
+        "predicted": -143.99,
+        "actual": -140.82,
         "n": 676
       }
     ],
     "importance": [
       {
         "feature": "Handle, first 14 days",
-        "importance": 0.2588
-      },
-      {
-        "feature": "Average stake",
-        "importance": 0.0895
-      },
-      {
-        "feature": "GGR, first 14 days",
-        "importance": 0.0704
-      },
-      {
-        "feature": "State",
-        "importance": 0.0603
+        "importance": 0.7256
       },
       {
         "feature": "Biggest single-day handle",
-        "importance": 0.0458
+        "importance": 0.1902
+      },
+      {
+        "feature": "Average stake",
+        "importance": 0.1562
+      },
+      {
+        "feature": "Parlay share of handle",
+        "importance": 0.128
+      },
+      {
+        "feature": "Season ahead, month 3",
+        "importance": 0.0318
+      },
+      {
+        "feature": "State",
+        "importance": 0.03
       },
       {
         "feature": "Bets, first 14 days",
-        "importance": 0.0212
+        "importance": 0.022
       },
       {
         "feature": "Days idle at day 14",
-        "importance": 0.0102
+        "importance": 0.0183
+      },
+      {
+        "feature": "Season ahead, days 14 to 179",
+        "importance": 0.0042
       },
       {
         "feature": "Active days, first 14",
-        "importance": 0.007
+        "importance": 0.0011
       },
       {
-        "feature": "Active days, week 2",
+        "feature": "Football share of handle",
         "importance": 0.0003
       },
       {
@@ -198,179 +209,202 @@
         "importance": 0.0
       }
     ],
-    "hidden_high_value_share_top_decile": 0.72,
+    "smearing_factor": 1.4789,
+    "auc_profitable": 0.946,
+    "hidden_high_value_share_top_decile": 0.723,
     "hidden_high_value_share_all": 0.1,
-    "hidden_bonus_hunter_share_bottom_half": 0.383,
-    "hidden_bonus_hunter_share_all": 0.21
+    "realized": {
+      "mean_actual": 232.04,
+      "spearman_model": 0.496,
+      "spearman_heuristic": 0.352,
+      "spearman_realized_trained_model": 0.542,
+      "sd_theo": 1426.43,
+      "sd_realized": 1939.9,
+      "corr_theo_realized": 0.689
+    }
   },
-  "value_two_part": {
-    "smearing_factor": 1.6952,
-    "auc_profitable": 0.869,
-    "mae_model": 359.02,
-    "spearman_model": 0.582,
+  "value_squared_error": {
+    "spearman_model": 0.872,
+    "mae_model": 154.42,
     "top_decile_model": {
-      "mean_top_decile": 2910.74,
-      "mean_all": 283.41,
-      "lift": 10.27,
-      "share_of_total": 1.028
+      "mean_top_decile": 2368.23,
+      "mean_all": 229.35,
+      "lift": 10.33,
+      "share_of_total": 1.034
     },
     "deciles": [
       {
         "decile": 1,
-        "predicted": 2476.59,
-        "actual": 2910.74,
+        "predicted": 2197.25,
+        "actual": 2368.23,
         "n": 676
       },
       {
         "decile": 2,
-        "predicted": 250.63,
-        "actual": 263.04,
+        "predicted": 213.57,
+        "actual": 264.4,
         "n": 675
       },
       {
         "decile": 3,
-        "predicted": 64.28,
-        "actual": 104.77,
+        "predicted": 46.02,
+        "actual": 74.74,
         "n": 675
       },
       {
         "decile": 4,
-        "predicted": -3.08,
-        "actual": 4.27,
+        "predicted": -9.45,
+        "actual": -1.04,
         "n": 676
       },
       {
         "decile": 5,
-        "predicted": -31.62,
-        "actual": -12.83,
+        "predicted": -29.29,
+        "actual": -26.55,
         "n": 675
       },
       {
         "decile": 6,
-        "predicted": -49.78,
-        "actual": -37.6,
+        "predicted": -40.33,
+        "actual": -36.42,
         "n": 675
       },
       {
         "decile": 7,
-        "predicted": -64.61,
-        "actual": -64.1,
+        "predicted": -54.06,
+        "actual": -53.69,
         "n": 676
       },
       {
         "decile": 8,
-        "predicted": -81.59,
-        "actual": -86.71,
+        "predicted": -70.4,
+        "actual": -70.7,
         "n": 675
       },
       {
         "decile": 9,
-        "predicted": -103.74,
-        "actual": -105.93,
+        "predicted": -90.28,
+        "actual": -88.63,
         "n": 675
       },
       {
         "decile": 10,
-        "predicted": -160.02,
-        "actual": -143.88,
+        "predicted": -135.98,
+        "actual": -138.72,
         "n": 676
       }
     ],
-    "mean_predicted": 229.9,
-    "mean_predicted_squared_error_model": 224.34,
-    "hidden_high_value_share_top_decile": 0.712
+    "mean_predicted": 202.88,
+    "hidden_high_value_share_top_decile": 0.723
+  },
+  "value_realized_target": {
+    "spearman_vs_theo": 0.771,
+    "top_ratio_vs_theo": 0.798,
+    "mean_predicted": 178.15
+  },
+  "luck": {
+    "train": {
+      "realized_hold": 0.0882,
+      "expected_hold": 0.0947,
+      "luck_pts": -0.65
+    },
+    "test": {
+      "realized_hold": 0.0942,
+      "expected_hold": 0.0929,
+      "luck_pts": 0.13
+    }
   },
   "calibration": {
     "xgboost": {
-      "brier": 0.2001,
+      "brier": 0.1993,
       "bins": [
         {
-          "pred": 0.2781,
+          "pred": 0.2226,
           "actual": 0.2396
         },
         {
-          "pred": 0.341,
-          "actual": 0.2993
+          "pred": 0.3101,
+          "actual": 0.2844
         },
         {
-          "pred": 0.3765,
-          "actual": 0.3748
+          "pred": 0.3692,
+          "actual": 0.3926
         },
         {
-          "pred": 0.4063,
-          "actual": 0.4083
+          "pred": 0.4135,
+          "actual": 0.4172
         },
         {
-          "pred": 0.4427,
-          "actual": 0.4341
+          "pred": 0.4578,
+          "actual": 0.4607
         },
         {
-          "pred": 0.5021,
-          "actual": 0.4919
+          "pred": 0.5166,
+          "actual": 0.5156
         },
         {
-          "pred": 0.5843,
-          "actual": 0.6243
+          "pred": 0.6094,
+          "actual": 0.6139
         },
         {
-          "pred": 0.7099,
-          "actual": 0.7719
+          "pred": 0.7447,
+          "actual": 0.7911
         },
         {
-          "pred": 0.8086,
-          "actual": 0.8341
+          "pred": 0.8389,
+          "actual": 0.8356
         },
         {
-          "pred": 0.8758,
-          "actual": 0.9083
+          "pred": 0.8998,
+          "actual": 0.9068
         }
       ]
     },
     "logistic": {
-      "brier": 0.1995,
+      "brier": 0.201,
       "bins": [
         {
-          "pred": 0.239,
-          "actual": 0.2589
+          "pred": 0.2076,
+          "actual": 0.2604
         },
         {
-          "pred": 0.2973,
-          "actual": 0.2904
+          "pred": 0.2913,
+          "actual": 0.28
         },
         {
-          "pred": 0.3427,
-          "actual": 0.3363
+          "pred": 0.3537,
+          "actual": 0.3748
         },
         {
-          "pred": 0.3881,
-          "actual": 0.3964
+          "pred": 0.4094,
+          "actual": 0.4053
         },
         {
-          "pred": 0.442,
-          "actual": 0.4681
+          "pred": 0.4644,
+          "actual": 0.4726
         },
         {
-          "pred": 0.5081,
-          "actual": 0.5007
+          "pred": 0.529,
+          "actual": 0.5274
         },
         {
-          "pred": 0.5896,
-          "actual": 0.6154
+          "pred": 0.6084,
+          "actual": 0.6346
         },
         {
-          "pred": 0.6939,
-          "actual": 0.7733
+          "pred": 0.7011,
+          "actual": 0.7719
         },
         {
-          "pred": 0.798,
-          "actual": 0.8356
+          "pred": 0.7997,
+          "actual": 0.8326
         },
         {
-          "pred": 0.9126,
-          "actual": 0.9112
+          "pred": 0.9042,
+          "actual": 0.8979
         }
       ]
     },
-    "brier_base_rate": 0.2487
+    "brier_base_rate": 0.248
   }
 }

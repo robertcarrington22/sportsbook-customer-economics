@@ -1,0 +1,16 @@
+feature,psi,alert,n_recent
+season_m3,8.3349,True,1530
+season_ahead_180,6.9529,True,1530
+football_share_14,5.8126,True,1530
+n_sports_14,1.1422,True,1530
+active_days_wk2,0.0089,False,1530
+ggr_14,0.0078,False,1530
+active_days_14,0.0077,False,1530
+handle_14,0.0076,False,1530
+bets_14,0.0072,False,1530
+days_idle_at_d14,0.0065,False,1530
+avg_stake_14,0.0058,False,1530
+max_day_handle_14,0.0049,False,1530
+live_share_14,0.0036,False,1530
+welcome_promo_cost,0.0034,False,1530
+parlay_share_14,0.0033,False,1530

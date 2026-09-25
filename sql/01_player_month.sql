@@ -27,6 +27,7 @@ act AS (
         sum(a.bets)     AS bets,
         sum(a.handle)   AS handle,
         sum(a.ggr)      AS ggr,
+        sum(a.theo_ggr) AS theo_ggr,
         sum(a.reinvest) AS reinvest
     FROM activity AS a
     JOIN players AS pl USING (player_id)
@@ -48,6 +49,7 @@ base AS (
         coalesce(a.bets, 0)        AS bets,
         coalesce(a.handle, 0)      AS handle,
         coalesce(a.ggr, 0)         AS ggr,
+        coalesce(a.theo_ggr, 0)    AS theo_ggr,
         coalesce(a.reinvest, 0)    AS reinvest,
         CASE WHEN m.life_month = 0 THEN p.welcome_promo_cost ELSE 0 END AS welcome_promo
     FROM months AS m
@@ -58,13 +60,17 @@ econ AS (
     SELECT
         *,
         ggr - reinvest - welcome_promo AS ngr,
+        theo_ggr - reinvest - welcome_promo AS theo_ngr,
         handle * (SELECT variable_cost_pct_handle FROM params) AS variable_cost
     FROM base
 )
 SELECT
     *,
     ngr * tax_rate                         AS gaming_tax,
-    ngr * (1 - tax_rate) - variable_cost   AS contribution
+    ngr * (1 - tax_rate) - variable_cost   AS contribution,
+    -- Theoretical contribution: the same calculation on expected rather than realized GGR,
+    -- which removes short-run luck in bet outcomes. Sportsbooks value players on this basis ("theo").
+    theo_ngr * (1 - tax_rate) - variable_cost AS theo_contribution
 FROM econ;
 
 SELECT

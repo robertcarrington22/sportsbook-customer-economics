@@ -1,0 +1,16 @@
+feature,psi,alert,n_recent
+welcome_promo_cost,,False,0
+active_days_14,,False,0
+active_days_wk2,,False,0
+bets_14,,False,0
+handle_14,,False,0
+ggr_14,,False,0
+max_day_handle_14,,False,0
+avg_stake_14,,False,0
+days_idle_at_d14,,False,0
+parlay_share_14,,False,0
+live_share_14,,False,0
+n_sports_14,,False,0
+football_share_14,,False,0
+season_ahead_180,,False,0
+season_m3,,False,0
