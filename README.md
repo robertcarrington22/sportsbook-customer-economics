@@ -57,7 +57,7 @@ Trained on September 2024 to April 2025 signups, tested on May to August 2025:
 
 The honest read: **to find the top tenth, sorting by two-week handle is as good as the model.** The model earns its keep on everyone else, ranking the middle and bottom of the distribution well enough to set per-player bid caps and retention spend. Because the data is simulated, each player's hidden type is known, so the model can be checked against it. **62%** of its top decile are true high-value players, against a 10% base rate.
 
-The model is biased low on the top decile. It predicts about $1,300 where the actual average is about $2,300, because squared-error loss shrinks a heavy right tail. Anything that sets a bid cap from predicted value should model log value or recalibrate the top first.
+The model is biased low on the top decile. It predicts about $1,400 where the actual average is about $2,300, because squared-error loss shrinks a heavy right tail. Anything that sets a bid cap from predicted value should model log value or recalibrate the top first.
 
 ### Recommendations
 
