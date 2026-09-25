@@ -7,10 +7,11 @@ boosting when it only sees a small sample of players?
 
 Three setups, all scored on the same May to August 2025 test cohorts:
   1. TabPFN v2, 3,000 training players as context
-  2. HistGradientBoosting on the same 3,000 players
-  3. HistGradientBoosting on all ~33,000 training players (from model.py)
+  2. XGBoost on the same 3,000 players
+  3. XGBoost on all ~33,000 training players (from model.py)
 
-Runs on CPU in roughly 20 to 30 minutes, so it's a separate step. Results are
+TabPFN inference takes about 15 minutes on CPU, so it's a separate step and its
+predictions are cached in outputs/tabpfn_predictions.parquet (use --refresh to redo). Results are
 cached to outputs/model_alternatives.json and picked up by build_report.py.
 
 Model weights: TabPFN v2 from Hugging Face (Prior-Labs/TabPFN-v2-clf, -reg),
@@ -21,18 +22,18 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import time
 
 import numpy as np
 import pandas as pd
 import torch
 from scipy.stats import spearmanr
-from sklearn.ensemble import HistGradientBoostingClassifier, HistGradientBoostingRegressor
 from sklearn.metrics import mean_absolute_error, roc_auc_score
 from tabpfn import TabPFNClassifier, TabPFNRegressor
 from tabpfn.constants import ModelVersion
 
-from model import CATS, NUMS, OUT, ROOT, load, top_decile
+from model import CATS, NUMS, OUT, ROOT, fit_xgb, load, top_decile
 
 N_CONTEXT = 3000
 N_ESTIMATORS = 4
@@ -66,28 +67,32 @@ def main() -> None:
     cat_idx = list(range(len(CATS)))
 
     # ---- TabPFN ----------------------------------------------------------
-    clf = TabPFNClassifier.create_default_for_version(
-        ModelVersion.V2, device="cpu", n_estimators=N_ESTIMATORS, categorical_features_indices=cat_idx, random_state=0,
-        ignore_pretraining_limits=True,
-    )
-    clf.fit(X_ctx, y_ctx)
-    p_pfn = predict_batched(lambda x: clf.predict_proba(x)[:, 1], X_te, "TabPFN retention")
-
-    reg = TabPFNRegressor.create_default_for_version(
-        ModelVersion.V2, device="cpu", n_estimators=N_ESTIMATORS, categorical_features_indices=cat_idx, random_state=0,
-        ignore_pretraining_limits=True,
-    )
-    reg.fit(X_ctx, v_ctx)
-    v_pfn = predict_batched(reg.predict, X_te, "TabPFN value")
+    # Predictions are cached: TabPFN takes ~15 minutes on CPU, the baselines take seconds.
+    cache = OUT / "tabpfn_predictions.parquet"
+    if cache.exists() and "--refresh" not in sys.argv:
+        cached = pd.read_parquet(cache)
+        assert cached["player_id"].tolist() == test["player_id"].tolist(), "test set changed; run with --refresh"
+        p_pfn, v_pfn = cached["p_active_m3"].to_numpy(), cached["contribution_180_hat"].to_numpy()
+        print("using cached TabPFN predictions")
+    else:
+        clf = TabPFNClassifier.create_default_for_version(
+            ModelVersion.V2, device="cpu", n_estimators=N_ESTIMATORS, categorical_features_indices=cat_idx,
+            random_state=0, ignore_pretraining_limits=True,
+        )
+        clf.fit(X_ctx, y_ctx)
+        p_pfn = predict_batched(lambda x: clf.predict_proba(x)[:, 1], X_te, "TabPFN retention")
+        reg = TabPFNRegressor.create_default_for_version(
+            ModelVersion.V2, device="cpu", n_estimators=N_ESTIMATORS, categorical_features_indices=cat_idx,
+            random_state=0, ignore_pretraining_limits=True,
+        )
+        reg.fit(X_ctx, v_ctx)
+        v_pfn = predict_batched(reg.predict, X_te, "TabPFN value")
+        pd.DataFrame({"player_id": test["player_id"], "p_active_m3": p_pfn, "contribution_180_hat": v_pfn}).to_parquet(cache)
 
     # ---- Gradient boosting on the same 3,000 players ---------------------
-    gb_c = HistGradientBoostingClassifier(categorical_features="from_dtype", learning_rate=0.05, max_iter=400,
-                                          early_stopping=True, random_state=0)
-    gb_c.fit(ctx[CATS + NUMS], y_ctx)
+    gb_c = fit_xgb("clf", ctx[CATS + NUMS], y_ctx)
     p_gb = gb_c.predict_proba(test[CATS + NUMS])[:, 1]
-    gb_r = HistGradientBoostingRegressor(categorical_features="from_dtype", learning_rate=0.05, max_iter=500,
-                                         early_stopping=True, random_state=0)
-    gb_r.fit(ctx[CATS + NUMS], v_ctx)
+    gb_r = fit_xgb("reg", ctx[CATS + NUMS], v_ctx)
     v_gb = gb_r.predict(test[CATS + NUMS])
 
     # ---- Full-data gradient boosting, from model.py ---------------------
@@ -111,9 +116,9 @@ def main() -> None:
         "n_estimators": N_ESTIMATORS,
         "models": [
             {"name": f"TabPFN v2, {N_CONTEXT:,} players", "auc": round(float(roc_auc_score(y_te, p_pfn)), 3), **value_metrics(v_pfn)},
-            {"name": f"Gradient boosting, {N_CONTEXT:,} players", "auc": round(float(roc_auc_score(y_te, p_gb)), 3), **value_metrics(v_gb)},
+            {"name": f"XGBoost, {N_CONTEXT:,} players", "auc": round(float(roc_auc_score(y_te, p_gb)), 3), **value_metrics(v_gb)},
             {
-                "name": f"Gradient boosting, {full['split']['n_train']:,} players",
+                "name": f"XGBoost, {full['split']['n_train']:,} players",
                 "auc": full["retention"]["auc_gbm"],
                 "spearman": full["value"]["spearman_model"],
                 "mae": full["value"]["mae_model"],

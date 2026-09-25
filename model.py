@@ -20,12 +20,34 @@ import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
 from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import HistGradientBoostingClassifier, HistGradientBoostingRegressor
 from sklearn.inspection import permutation_importance
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import average_precision_score, mean_absolute_error, roc_auc_score
+from sklearn.model_selection import train_test_split
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import FunctionTransformer, OneHotEncoder, StandardScaler
+from xgboost import XGBClassifier, XGBRegressor
+
+# XGBoost settings shared by model.py and model_tabpfn.py. Native categorical
+# splits, histogram trees, and early stopping on a held-out 10% of the training
+# rows, so the number of trees is chosen by validation rather than by hand.
+XGB_PARAMS = dict(
+    n_estimators=3000, learning_rate=0.03, max_depth=6, min_child_weight=5, subsample=0.8,
+    colsample_bytree=0.8, reg_lambda=1.0, tree_method="hist", enable_categorical=True, max_cat_to_onehot=1,
+    early_stopping_rounds=100, random_state=0, n_jobs=-1,
+)
+
+
+def fit_xgb(kind: str, X: pd.DataFrame, y: np.ndarray):
+    """Fit an XGBoost classifier ('clf') or squared-error regressor ('reg') with early stopping."""
+    X_fit, X_val, y_fit, y_val = train_test_split(
+        X, y, test_size=0.1, random_state=0, stratify=y if kind == "clf" else None
+    )
+    model = XGBClassifier(**XGB_PARAMS, eval_metric="auc") if kind == "clf" else \
+        XGBRegressor(**XGB_PARAMS, objective="reg:squarederror", eval_metric="rmse")
+    model.fit(X_fit, y_fit, eval_set=[(X_val, y_val)], verbose=False)
+    return model
+
 
 ROOT = Path(__file__).parent
 OUT = ROOT / "outputs"
@@ -66,7 +88,7 @@ def signed_log(x):
 
 def load() -> tuple[pd.DataFrame, pd.DataFrame]:
     # Sort explicitly: DuckDB does not guarantee row order, and row order
-    # decides which rows HistGradientBoosting holds out for early stopping.
+    # decides which rows XGBoost holds out for early stopping.
     df = pd.read_parquet(OUT / "features.parquet").sort_values("player_id", ignore_index=True)
     df["cohort_month"] = pd.to_datetime(df["cohort_month"])
     for c in CATS:
@@ -101,6 +123,7 @@ def main() -> None:
     train, test = load()
     X_tr, X_te = train[CATS + NUMS], test[CATS + NUMS]
     results: dict = {
+        "gbm": "XGBoost",
         "split": {
             "train_cohorts": f"{train.cohort_month.min():%b %Y} to {train.cohort_month.max():%b %Y}",
             "test_cohorts": f"{test.cohort_month.min():%b %Y} to {test.cohort_month.max():%b %Y}",
@@ -123,10 +146,7 @@ def main() -> None:
     linear.fit(X_tr, y_tr)
     p_lin = linear.predict_proba(X_te)[:, 1]
 
-    gbm_c = HistGradientBoostingClassifier(
-        categorical_features="from_dtype", learning_rate=0.05, max_iter=400, early_stopping=True, random_state=0
-    )
-    gbm_c.fit(X_tr, y_tr)
+    gbm_c = fit_xgb("clf", X_tr, y_tr)
     p_gbm = gbm_c.predict_proba(X_te)[:, 1]
 
     at_risk = p_gbm <= np.quantile(p_gbm, 0.1)
@@ -142,10 +162,7 @@ def main() -> None:
 
     # ---- 2. 180-day contribution -----------------------------------------
     v_tr, v_te = train["contribution_180"].to_numpy(), test["contribution_180"].to_numpy()
-    gbm_r = HistGradientBoostingRegressor(
-        categorical_features="from_dtype", learning_rate=0.05, max_iter=500, early_stopping=True, random_state=0
-    )
-    gbm_r.fit(X_tr, v_tr)
+    gbm_r = fit_xgb("reg", X_tr, v_tr)
     v_hat = gbm_r.predict(X_te)
     heuristic = test["handle_14"].to_numpy()  # "sort by what they bet in two weeks"
 
@@ -178,8 +195,55 @@ def main() -> None:
         "hidden_bonus_hunter_share_all": round(float((ttype == "bonus_hunter").mean()), 3),
     }
 
+    # ---- 3. Two-part value model -------------------------------------------
+    # The squared-error model shrinks the heavy right tail and predicts too low
+    # for the most valuable players. Split the problem:
+    #   P(profitable)                     XGBoost classifier
+    #   E[value | profitable]             XGBoost on log(1 + value), retransformed
+    #                                     with Duan's smearing factor from held-out rows
+    #   E[value | not profitable]         XGBoost on the (bounded) losses
+    # and combine: E[value] = p * E[pos] + (1 - p) * E[neg].
+    pos = v_tr > 0
+    clf_pos = fit_xgb("clf", X_tr, pos.astype(int))
+    p_pos = clf_pos.predict_proba(X_te)[:, 1]
+    Xp, vp = X_tr[pos].reset_index(drop=True), np.log1p(v_tr[pos])
+    fit_idx, smear_idx = train_test_split(np.arange(len(Xp)), test_size=0.2, random_state=1)
+    reg_pos = fit_xgb("reg", Xp.iloc[fit_idx], vp[fit_idx])
+    smear = float(np.mean(np.exp(vp[smear_idx] - reg_pos.predict(Xp.iloc[smear_idx]))))
+    e_pos = np.exp(reg_pos.predict(X_te)) * smear - 1
+    reg_neg = fit_xgb("reg", X_tr[~pos], v_tr[~pos])
+    e_neg = reg_neg.predict(X_te)
+    v_two = p_pos * e_pos + (1 - p_pos) * e_neg
+    top2 = v_two >= np.quantile(v_two, 0.9)
+    results["value_two_part"] = {
+        "smearing_factor": round(smear, 4),
+        "auc_profitable": round(float(roc_auc_score(v_te > 0, p_pos)), 3),
+        "mae_model": round(float(mean_absolute_error(v_te, v_two)), 2),
+        "spearman_model": round(float(spearmanr(v_two, v_te).statistic), 3),
+        "top_decile_model": top_decile(v_two, v_te),
+        "deciles": decile_table(v_two, v_te),
+        "mean_predicted": round(float(v_two.mean()), 2),
+        "mean_predicted_squared_error_model": round(float(v_hat.mean()), 2),
+        "hidden_high_value_share_top_decile": round(float((ttype[top2] == "high_value").mean()), 3),
+    }
+
+    # ---- 4. Calibration of the retention models ----------------------------
+    def reliability(p: np.ndarray, y: np.ndarray) -> list[dict]:
+        bins = pd.qcut(p, 10, labels=False, duplicates="drop")
+        g = pd.DataFrame({"b": bins, "p": p, "y": y}).groupby("b").agg(pred=("p", "mean"), actual=("y", "mean"))
+        return [{"pred": round(float(r.pred), 4), "actual": round(float(r.actual), 4)} for r in g.itertuples()]
+
+    def brier(p, y):
+        return round(float(np.mean((p - y) ** 2)), 4)
+
+    results["calibration"] = {
+        "xgboost": {"brier": brier(p_gbm, y_te), "bins": reliability(p_gbm, y_te)},
+        "logistic": {"brier": brier(p_lin, y_te), "bins": reliability(p_lin, y_te)},
+        "brier_base_rate": brier(np.full_like(p_gbm, y_tr.mean()), y_te),
+    }
+
     (OUT / "model_results.json").write_text(json.dumps(results, indent=2))
-    print(json.dumps({k: v for k, v in results.items()}, indent=2)[:4000])
+    print(json.dumps({k: v for k, v in results.items() if k in ("value_two_part", "calibration")}, indent=1)[:3000])
 
 
 if __name__ == "__main__":

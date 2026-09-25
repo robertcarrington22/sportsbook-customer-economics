@@ -4,7 +4,7 @@ Robert Carrington · September 2026
 
 ## Abstract
 
-This report estimates what a sportsbook's first-time depositors (FTDs) cost to acquire, what they contribute in their first year, and how early their value can be predicted. The player-level data is a simulation of 40,000 FTDs whose seasonality, hold, and hold volatility are calibrated to DraftKings' public monthly filings in New York. Year-one contribution averages $585 per FTD against a blended CAC of $323, a 1.81× return, but value is highly concentrated: the top 1% of FTDs produce 46% of it and 66% are net negative at day 180. Channel, welcome offer, and state tax each move payback materially. A gradient boosting model on the first 14 days of activity ranks players' 180-day value with a Spearman correlation of 0.52, against 0.37 for sorting by early handle alone. A separate section tests TabPFN, a pretrained tabular foundation model. Given 3,000 training players and no tuning, it ranks 180-day value at 0.59 Spearman, better than gradient boosting trained on all 33,246, and comes within 0.008 AUC of it on retention.
+This report estimates what a sportsbook's first-time depositors (FTDs) cost to acquire, what they contribute in their first year, and how early their value can be predicted. The player-level data is a simulation of 40,000 FTDs whose seasonality, hold, and hold volatility are calibrated to DraftKings' public monthly filings in New York. Year-one contribution averages $585 per FTD against a blended CAC of $323, a 1.81× return, but value is highly concentrated: the top 1% of FTDs produce 46% of it and 66% are net negative at day 180. Channel, welcome offer, and state tax each move payback materially. An XGBoost model on the first 14 days of activity ranks players' 180-day value with a Spearman correlation of 0.57, against 0.37 for sorting by early handle alone, and a two-part version improves that to 0.58 while fixing most of the model's under-prediction for top players. A retention-decay model, backtested within 5% of actual 12-month value from six months of data, projects 36-month returns of 3.1× to 9.4× CAC across channels. The report also sizes the experiments needed to act on its recommendations. A separate section tests TabPFN, a pretrained tabular foundation model. Given 3,000 training players and no tuning, it ranks 180-day value at 0.59 Spearman, better than XGBoost trained on all 33,246, and comes within 0.008 AUC of it on retention.
 
 I built this for the Analyst I, Customer Economics role at DraftKings. None of it uses DraftKings internal data, and where a result follows directly from an assumption rather than from the analysis, I say so.
 
@@ -26,9 +26,10 @@ I built this for the Analyst I, Customer Economics role at DraftKings. None of i
 5. [Feature engineering](#5-feature-engineering)
 6. [Modeling choices](#6-modeling-choices)
 7. [Findings](#7-findings)
-8. [Conclusion](#8-conclusion)
-9. [TabPFN: process and comparison](#9-tabpfn-process-and-comparison)
-10. [Reproducibility](#10-reproducibility)
+8. [Test design for the recommended changes](#8-test-design-for-the-recommended-changes)
+9. [Conclusion](#9-conclusion)
+10. [TabPFN: process and comparison](#10-tabpfn-process-and-comparison)
+11. [Reproducibility](#11-reproducibility)
 
 ## 1. Objective
 
@@ -94,7 +95,7 @@ All transformation is in SQL (DuckDB), in `sql/01` through `sql/15`. The central
 contribution = GGR - welcome promo - ongoing promos - tax x (GGR - promos) - 0.6% x handle
 ```
 
-It is a contribution margin, not profit: it excludes fixed costs and overhead. Tax is applied to GGR net of promos as a simplification (section 8.3).
+It is a contribution margin, not profit: it excludes fixed costs and overhead. Tax is applied to GGR net of promos as a simplification (section 9.3).
 
 ## 4. Exploratory data analysis
 
@@ -175,16 +176,20 @@ The prediction point is **day 14**: a model scores each FTD using only what is k
 - Largest single-day handle is included alongside total handle because a few large days signal a high-stakes player differently from many small ones.
 - **Leakage check:** no feature uses anything after day 13, and nothing downstream of the outcome (such as churn date or lifetime) is available to the model.
 
-Transformations depend on the model. For logistic regression, numeric features get a signed log transform, `sign(x) * log(1 + |x|)`, to tame the heavy tails (GGR can be negative), then standardization, and categoricals are one-hot encoded. Gradient boosting takes raw values and native categorical splits, since trees are invariant to monotone transforms.
+Transformations depend on the model. For logistic regression, numeric features get a signed log transform, `sign(x) * log(1 + |x|)`, to tame the heavy tails (GGR can be negative), then standardization, and categoricals are one-hot encoded. XGBoost takes raw values and native categorical splits, since trees are invariant to monotone transforms.
 
 ## 6. Modeling choices
 
 - **Out-of-time split.** Train on Sep 2024 to Apr 2025 signups (33,246 players), test on May 2025 to Aug 2025 (6,754). A random split would leak seasonal information across the boundary, and in practice the model is fit on past cohorts and used on new ones.
 - **Baselines first.** Logistic regression for retention, and two naive rules for value: sort by 14-day handle, and predict the training mean.
-- **Gradient boosting** (scikit-learn `HistGradientBoosting`) as the main model. It handles missing values, categoricals, and interactions without manual work, and is the standard strong baseline for tabular data. Early stopping on an internal validation split, learning rate 0.05.
+- **XGBoost** as the main model: histogram trees with native categorical splits, which handle missing values, categoricals, and interactions without manual work. It is the standard strong baseline for tabular data. Settings: learning rate 0.03, max depth 6, minimum child weight 5, row and column subsampling of 0.8, and early stopping after 100 rounds without improvement on a held-out 10% of the training rows, so the number of trees is chosen by validation. Squared-error objective for value, log loss for retention.
 - **Metrics chosen for the skew.** AUC for retention (ranking quality, insensitive to the threshold). For value, Spearman rank correlation and top-decile lift, because the business action is ranking players and a few whales dominate any squared-error metric. Mean absolute error is reported for completeness.
 - **Permutation importance** on the test set, which measures how much accuracy drops when a feature is shuffled and is less biased toward high-cardinality features than split-based importance.
 - **Bootstrap intervals** for channel LTV/CAC: 2,000 resamples of players within each channel, 95% percentile intervals. Given the skew in 4.2, point estimates alone would overstate precision.
+- **A two-part value model** as a second specification, because squared-error loss shrinks a heavy right tail. One XGBoost classifier estimates the chance a player ends up profitable. A second XGBoost model predicts log(1 + value) for profitable players, converted back to dollars with Duan's smearing correction estimated on held-out rows. A third predicts the size of the loss for unprofitable players. Expected value is p × E[value | profitable] + (1 − p) × E[value | not profitable].
+- **Calibration checks.** Brier score and reliability curves (predicted probability against the actual share, by decile) for the retention models, and predicted against actual value by decile for the value models. Ranking metrics say nothing about whether a predicted $500 is really $500, and bids are set in dollars.
+- **Lifetime value beyond the observed window** with a shifted-beta-geometric (sBG) retention curve per channel: the share of FTDs still betting in month t is S(t) = B(a, b + t) / B(a, b), which allows churn to differ across players and gives the long, slow-decaying tail a single churn rate cannot. Projected contribution is S(t) times the value of an active player (the average of the last three observed months). The method is backtested twice on held-out months before it is used, with bootstrap intervals on the projections.
+- **Test design** for the recommended changes: sample size per arm at 5% significance and 80% power, winsorizing the outcome at the 99th percentile to tame the tail, and CUPED or regression adjustment on pre-treatment covariates to reduce variance.
 
 ## 7. Findings
 
@@ -192,19 +197,35 @@ Transformations depend on the model. For logistic regression, numeric features g
 
 ![Model results](figures/09_model.png)
 
-| Question | Metric | Gradient boosting | Baseline |
+| Question | Metric | XGBoost | Baseline |
 |:---|:---|---:|:---|
 | Bets in month 3? | AUC | 0.753 | 0.755 (logistic regression) |
-| Flag the at-risk decile | Share who lapse | 78% | 46% (all players) |
-| Rank by 180-day value | Spearman | 0.519 | 0.367 (sort by 14-day handle) |
-| Find the top decile | Lift over average | 10.17× | 10.07× (sort by 14-day handle) |
+| Flag the at-risk decile | Share who lapse | 76% | 46% (all players) |
+| Rank by 180-day value | Spearman | 0.572 | 0.367 (sort by 14-day handle) |
+| Find the top decile | Lift over average | 10.20× | 10.07× (sort by 14-day handle) |
 | Predict dollar value | Mean absolute error | $379 | $690 (predict the mean) |
 | Find hidden high-value players | Share of top decile | 72% | 10% (base rate) |
 
-- On retention, logistic regression matches gradient boosting (0.755 vs 0.753 AUC). The simpler model is the one to ship there.
-- On value, gradient boosting ranks the whole base better than early handle alone (0.52 vs 0.37), but ties it on the top decile. Use the model for bids and retention spend across everyone, and a handle threshold for routing likely high-value players to VIP.
-- The value model is biased low at the top: it predicts $2,529 for its top decile, which actually averages $2,884. Squared-error loss shrinks a heavy right tail. Modeling log value or recalibrating the top decile would fix it before anyone sets bids from it.
+- On retention, logistic regression matches XGBoost (0.755 vs 0.753 AUC). The simpler model is the one to ship there.
+- On value, XGBoost ranks the whole base better than early handle alone (0.57 vs 0.37), but ties it on the top decile. Use the model for bids and retention spend across everyone, and a handle threshold for routing likely high-value players to VIP.
+- The squared-error value model is biased low at the top: it predicts $2,147 for its top decile, which actually averages $2,890. The two-part model below addresses this.
 - 72% of the model's top decile are truly high-value players, against a 10% base rate, which confirms it is finding the right people rather than fitting noise.
+
+**Two-part value model.** Same features, same split, three XGBoost models combined as described in section 6.
+
+| Metric | Squared-error XGBoost | Two-part XGBoost |
+|:---|---:|---:|
+| Top-decile prediction ÷ actual | 0.74 | 0.85 |
+| Spearman, 180-day value | 0.572 | 0.582 |
+| Mean absolute error | $379 | $359 |
+| Top-decile lift | 10.20× | 10.27× |
+| High-value share of top decile | 72% | 71% |
+
+The two-part model closes much of the gap at the top, from 0.74 to 0.85 of the actual top-decile value, and improves ranking and average error, while finding about the same share of true high-value players. Its classifier separates eventually profitable players at 0.869 AUC. The smearing factor of 1.70 is large, which says the log-scale residuals are wide: individual predictions are noisy even when decile averages are right. Both value models predict a lower average than the test cohorts actually produced ($230 against $283), so predicted dollars should be recalibrated on recent cohorts before being used as bids.
+
+![Calibration](figures/14_calibration.png)
+
+**Calibration.** Both retention models beat the base rate on Brier score (0.200 for XGBoost, 0.200 for logistic regression, 0.249 for predicting the training average). XGBoost's probabilities are slightly compressed: its lowest decile predicts 28% and sees 24%, and its highest predicts 88% and sees 91%. Logistic regression tracks the diagonal more closely, which is one more reason to prefer it for retention scoring. On value, the two-part model's deciles sit close to the diagonal while the squared-error model's sit below it.
 
 ### 7.2 Channel economics
 
@@ -246,75 +267,144 @@ A New York FTD contributes $364 in year one at 51% tax, against $718 in Michigan
 | Affiliate (CAC $452) | **$426** | $655 | $773 | $771 | $889 | $528 | $1,137 | $860 | $898 |
 | Paid social (CAC $310) | **$227** | $354 | $331 | $407 | $512 | $523 | **$258** | $506 | $454 |
 
-## 8. Conclusion
+### 7.5 Lifetime value beyond 12 months
 
-### 8.1 Summary
+Twelve months understates what a player is worth, because a meaningful share are still betting at month 12. Before projecting further, I tested the projection method on months it never saw.
 
-An FTD in this simulation returns 1.81× its acquisition cost in year one, but that average hides extreme concentration: 46% of contribution comes from 1% of players and most players lose money after promos. The biggest levers are which channel a player comes from, which offer they receive, and which state they bet in. Two weeks of behavior is enough to rank players usefully, and a simple model on those two weeks ranks them better than early handle alone. Section 9 tests a pretrained tabular model, TabPFN, on the same problem.
+![LTV backtest](figures/12_ltv_backtest.png)
 
-### 8.2 Recommendations
+| Backtest | sBG decay model | Flat run rate | Stop counting | sBG, mean channel error |
+|:---|---:|---:|---:|---:|
+| Fit months 1 to 6, predict month 12 (36,457 FTDs) | +5.1% | +16.0% | -44.4% | 6.9% |
+| Fit months 1 to 12, predict month 18 (20,012 FTDs) | -3.2% | -0.9% | -28.5% | 4.1% |
 
-1. Test the no-sweat offer against bet $5 get $200 in paid social, with a holdout, before changing that channel's budget.
-2. Set acquisition bid caps by state (7.4) rather than one national CAC target.
-3. Score every FTD at day 14. Use the value model for retention spend across the whole base, and a handle threshold to route likely high-value players to VIP.
-4. Report channel LTV with an interval. With value this concentrated, a few players can move a channel's average.
-5. Use logistic regression for retention scoring: it matches gradient boosting and is easier to explain.
+Early on, the decay model is clearly best: from six months of data it lands +5.1% from the actual 12-month value, where a flat run rate overshoots by +16.0% and ignoring the future misses by -44.4%. By month 12, value per player has flattened enough that a flat run rate does about as well over the next six months (-0.9% against -3.2%). But a run rate never decays, so it cannot be stretched to 36 months. The decay model can, and its backtest errors bound how far to trust it.
 
-### 8.3 Limitations
+![LTV projection](figures/11_ltv_projection.png)
+
+| Channel | CAC | 12-mo LTV | 24-mo LTV | 36-mo LTV | 36-mo LTV / CAC | Still betting, month 36 |
+|:---|---:|---:|---:|---:|---:|---:|
+| Referral | $160 | $709 | $1,160 ($982 to $1,363) | $1,510 ($1,286 to $1,775) | 9.42× (8.03 to 11.07) | 18% |
+| TV and brand | $220 | $485 | $801 ($689 to $917) | $1,041 ($878 to $1,202) | 4.74× (4.00 to 5.47) | 16% |
+| Search | $390 | $740 | $1,236 ($1,065 to $1,426) | $1,620 ($1,390 to $1,885) | 4.16× (3.56 to 4.84) | 17% |
+| Affiliate | $452 | $718 | $1,297 ($1,134 to $1,457) | $1,752 ($1,526 to $1,969) | 3.88× (3.38 to 4.36) | 15% |
+| Paid social | $310 | $380 | $704 ($599 to $836) | $953 ($805 to $1,150) | 3.08× (2.59 to 3.70) | 13% |
+
+Projected to 36 months, returns range from 9.4× for referral to 3.1× for paid social. The channel ranking is the same as at 12 months. The practical use is setting CAC targets: a team that requires payback inside 12 months is leaving value on the table for channels whose players keep betting, and the intervals show how much of that value is reliable. The projection holds value per active player flat and assumes churned players never return. The later backtest came in 3% low, which suggests the long-run numbers lean conservative, but beyond 18 months they are untested.
+
+## 8. Test design for the recommended changes
+
+Two recommendations need experiments before anyone acts on them: switching the welcome offer, and targeting retention spend with the model. This section sizes both tests. The two cases differ in one important way: what the analysis is allowed to adjust for.
+
+![Test design](figures/13_test_design.png)
+
+### 8.1 Welcome-offer test
+
+New depositors would be randomized at signup between the no-sweat offer and bet $5 get $200, with 180-day contribution as the outcome. The expected difference, from the simulation, is $112 per FTD. The outcome's standard deviation is $2,321, seven times its mean, so a plain test is expensive.
+
+| Minimum detectable effect | Raw outcome | Winsorized at 99th pct | Winsorized and adjusted |
+|:---|---:|---:|---:|
+| $25 | 135,304 | 37,315 | 37,104 |
+| $50 | 33,826 | 9,329 | 9,276 |
+| $100 | 8,457 | 2,333 | 2,319 |
+| $150 | 3,759 | 1,037 | 1,031 |
+
+- **Winsorizing** the outcome at the 99th percentile ($8,311) cuts the required sample by about 72%: to detect the expected $112 gap, 1,843 FTDs per arm instead of 6,683. The cost is a slightly different estimand, the effect on capped value, which should be stated up front.
+- **Covariate adjustment barely helps here.** Only information known before randomization is allowed, which for a new signup means channel, state, and signup month. Together they explain 0.6% of the variance.
+- **Early betting cannot be used as a covariate**, even though it would explain 34% of the variance. The offer changes how people bet in their first two weeks, so adjusting for that behavior would absorb part of the very effect being measured.
+- **Duration.** 3,686 FTDs in total is about 1.1 months of signups across all channels, or 4.0 months of paid social alone, plus 180 days to observe the outcome. The day-14 value model could provide an early read, but only as a leading indicator, not as the decision metric.
+
+### 8.2 Retention-spend test
+
+Existing players who bet in month 3 would be randomized to receive a retention offer or not at the start of month 4, with contribution in months 4 to 9 as the outcome (22,050 such players in the data). Here the first three months happened before randomization, so they are valid covariates. CUPED adjusts each player's outcome by their pre-period contribution; regression adjustment uses several pre-period measures.
+
+| Adjustment | Variance reduction, formula | Variance reduction, 1,000 random splits |
+|:---|---:|---:|
+| CUPED, pre-period contribution | 20% | 20% |
+| Regression, four pre-period measures | 26% | 22% |
+
+| Minimum detectable effect | Unadjusted | CUPED | Regression |
+|:---|---:|---:|---:|
+| $25 | 59,168 | 47,516 | 43,876 |
+| $50 | 14,792 | 11,879 | 10,969 |
+| $100 | 3,698 | 2,970 | 2,743 |
+| $150 | 1,644 | 1,320 | 1,219 |
+
+The formula and the simulation agree: adjusting for the pre-period cuts variance by about a fifth, which cuts the required sample by the same share. The right panel of the figure shows it directly. Across 1,000 random splits with no true effect, the CUPED estimate's standard deviation is $19 against $21 for a plain difference in means. Adding a covariate is free once the data exists, so there is no reason to run this test without it.
+
+## 9. Conclusion
+
+### 9.1 Summary
+
+An FTD in this simulation returns 1.81× its acquisition cost in year one, but that average hides extreme concentration: 46% of contribution comes from 1% of players and most players lose money after promos. The biggest levers are which channel a player comes from, which offer they receive, and which state they bet in. Two weeks of behavior is enough to rank players usefully, and a simple model on those two weeks ranks them better than early handle alone, especially with a two-part model. Projected with a retention-decay model that backtests within a few percent, 36-month returns run from 3.1× to 9.4× CAC. Section 10 tests a pretrained tabular model, TabPFN, on the same problem.
+
+### 9.2 Recommendations
+
+1. Test the no-sweat offer against bet $5 get $200 before changing any channel's budget: about 1,843 FTDs per arm with a winsorized outcome (section 8.1).
+2. Set acquisition bid caps by state (7.4) rather than one national CAC target, and base them on projected rather than 12-month value where the backtest supports it (7.5).
+3. Score every FTD at day 14 with the two-part value model, recalibrated on recent cohorts, for retention spend across the whole base. Use a handle threshold to route likely high-value players to VIP.
+4. Run the retention-spend test with CUPED on pre-period contribution; it cuts the required sample by about a fifth (section 8.2).
+5. Report channel LTV with an interval. With value this concentrated, a few players can move a channel's average.
+6. Use logistic regression for retention scoring: it matches XGBoost and is easier to explain.
+
+### 9.3 Limitations
 
 - Player-level data is simulated. Channel, offer, and player-type effects come from my assumptions, so conclusions about them demonstrate the method rather than describe real DraftKings economics.
 - Only seasonality, hold, hold volatility, and New York's tax rate are calibrated to real data, and only from New York, the highest-tax state.
 - Tax is a flat rate on GGR net of promos. Real states tier it, tax per wager, or limit promo deductions, and the non-New York rates are approximate.
 - No casino or daily fantasy cross-sell, and churned players never return.
+- LTV projections beyond 18 months are extrapolations. The backtests cover 6 to 12 and 12 to 18 months only, and the projection holds value per active player flat.
+- Sample sizes assume the simulated variance. Real outcome variance, and so the real required sample, should be measured on recent cohorts before a test launches.
 
-## 9. TabPFN: process and comparison
+## 10. TabPFN: process and comparison
 
-### 9.1 What TabPFN is
+### 10.1 What TabPFN is
 
 TabPFN (Hollmann et al., *Nature*, 2025) is a transformer pretrained by Prior Labs on millions of synthetic datasets drawn from a prior over how tabular data is generated: random causal structures, noise, missing values, and mixed types. It does not fit parameters to a new dataset. The labeled training rows go into the model as context, and it predicts the unlabeled rows in a single forward pass, in effect performing approximate Bayesian inference learned during pretraining. There is no hyperparameter tuning.
 
 The practical claim is strong accuracy on small and medium tables, where there is not enough data to train and tune a model well. That is a common situation in customer economics: a new state launch, a new promotion, or a new product, with a few thousand players and a decision due before more data arrives.
 
-### 9.2 Setup
+### 10.2 Setup
 
 - **Model version.** The open TabPFN v2 weights from Hugging Face (`Prior-Labs/TabPFN-v2-clf` and `-reg`), loaded through the `tabpfn` package. Newer versions (3.5) require an account and license acceptance for local use, so I used v2, which is ungated.
 - **Same problem as section 6.** Same features, same targets, same out-of-time test set of 6,754 players, so results are directly comparable.
 - **Context size.** 3,000 players sampled at random from the training cohorts. TabPFN v2 was pretrained on datasets up to about 10,000 rows, and inference cost grows with context size, so a smaller context kept the run feasible on a laptop CPU.
 - **Encoding.** Categorical columns were integer-coded and flagged as categorical so TabPFN applies its own categorical handling. Numeric features were passed raw: TabPFN does its own preprocessing internally, including transforms suited to skewed data.
 - **Ensembling.** 4 ensemble members, each with a different feature ordering and preprocessing, averaged.
-- **CPU.** TabPFN refuses CPU runs above 1,000 rows by default because they are slow, so I set `ignore_pretraining_limits=True` and predicted in batches of 1,000. Scoring the test set took about 7 minutes for retention and 9 minutes for value.
+- **CPU.** TabPFN refuses CPU runs above 1,000 rows by default because they are slow, so I set `ignore_pretraining_limits=True` and predicted in batches of 1,000. Scoring the 6,754 test players took between about 7 and 25 minutes per model across my runs, depending on what else the laptop was doing. The predictions are cached so the comparison can be rebuilt without rerunning TabPFN.
 
-To separate the effect of the model from the effect of less data, I compared three setups on the same test players: TabPFN on the 3,000-player sample, gradient boosting on the same 3,000, and gradient boosting on the full training set.
+To separate the effect of the model from the effect of less data, I compared three setups on the same test players: TabPFN on the 3,000-player sample, XGBoost on the same 3,000, and XGBoost on the full training set.
 
-### 9.3 Results
+### 10.3 Results
 
 ![TabPFN comparison](figures/10_tabpfn.png)
 
 | Model | Retention AUC | Value Spearman | Value MAE | Top-decile lift | High-value share, top decile |
 |:---|---:|---:|---:|---:|---:|
 | TabPFN v2, 3,000 players | 0.745 | 0.591 | $368 | 10.25× | 69% |
-| Gradient boosting, 3,000 players | 0.726 | 0.549 | $385 | 10.15× | 64% |
-| Gradient boosting, 33,246 players | 0.753 | 0.519 | $379 | 10.17× | 72% |
+| XGBoost, 3,000 players | 0.730 | 0.560 | $388 | 9.94× | 65% |
+| XGBoost, 33,246 players | 0.753 | 0.572 | $379 | 10.20× | 72% |
 
-### 9.4 Interpretation
+### 10.4 Interpretation
 
-- **At equal data**, TabPFN beats gradient boosting on retention by 0.019 AUC, and ranks 180-day value at 0.591 Spearman against 0.549.
-- **Against 11× the data**, gradient boosting on 33,246 players: TabPFN is within 0.008 on retention AUC, and scores 0.591 against 0.519 on value ranking. On value ranking, the model with a tenth of the data is the best of the three.
-- **Why value ranking goes this way.** Gradient boosting with squared-error loss spends its capacity fitting the few very large players, and its ranking of everyone else does not improve with more data (0.549 on 3,000 players, 0.519 on all of them). TabPFN predicts from a learned prior over tables rather than minimizing squared error on this one, which seems to make it less sensitive to the tail. Modeling log value with gradient boosting would be the fair next comparison.
-- **Finding the top players.** Top-decile lift is nearly identical across all three (10.25×, 10.15×, 10.17×), and the full-data model recovers slightly more of the hidden high-value players (72% vs 69%). TabPFN's edge is in ranking the middle of the base.
-- **Cost.** Gradient boosting trains and scores in seconds. TabPFN needed minutes per model on CPU, because every prediction attends over the whole context. At production scale it wants a GPU or Prior Labs' hosted API.
-- **Where I'd use it.** First, small-sample questions where there is no time or data to tune a model: early reads on a new state, offer, or product. Second, as a benchmark. Its value-ranking result here says the full-data gradient boosting model is leaving accuracy on the table, and the next step would be to fix that model's loss rather than assume more data solves it.
+- **At equal data**, TabPFN beats XGBoost on retention by 0.015 AUC, and ranks 180-day value at 0.591 Spearman against 0.560.
+- **Against 11× the data**, XGBoost on 33,246 players: TabPFN is within 0.008 on retention AUC, and scores 0.591 against 0.572 on value ranking. On value ranking, the model with a tenth of the data is the best of the three.
+- **Why value ranking goes this way.** XGBoost with squared-error loss spends much of its capacity fitting the few very large players, so its ranking of everyone else gains little from more data (0.560 on 3,000 players, 0.572 on all of them). TabPFN predicts from a learned prior over tables rather than minimizing squared error on this one, which seems to make it less sensitive to the tail. Modeling log value with XGBoost would be the fair next comparison.
+- **Against the two-part model.** Fixing XGBoost's loss (section 7.1) lifts its value ranking to 0.582 on the full data, which narrows but does not close the gap to TabPFN's 0.591. Part of TabPFN's edge was the loss function; part of it was not.
+- **Finding the top players.** Top-decile lift is nearly identical across all three (10.25×, 9.94×, 10.20×). The share of true high-value players in each model's top decile is 69%, 65%, and 72%.
+- **Cost.** XGBoost trains and scores in seconds. TabPFN needed minutes per model on CPU, because every prediction attends over the whole context. At production scale it wants a GPU or Prior Labs' hosted API.
+- **Where I'd use it.** First, small-sample questions where there is no time or data to tune a model: early reads on a new state, offer, or product. Second, as a benchmark. Its value-ranking result says the full-data XGBoost model is leaving accuracy on the table, and the next step would be to fix that model's loss rather than assume more data solves it.
 
 TabPFN v2 weights are released under the Prior Labs License, which is Apache 2.0 with an attribution requirement. Built with TabPFN.
 
-## 10. Reproducibility
+## 11. Reproducibility
 
 ```bash
 python -m venv .venv
 .venv/Scripts/pip install -r requirements.txt
-.venv/Scripts/python run.py            # simulate, SQL, models, report (about 30 seconds)
-.venv/Scripts/python model_tabpfn.py   # TabPFN comparison (about 15 to 20 minutes on CPU)
+.venv/Scripts/python run.py            # simulate, SQL, models, LTV projection, test design, report (under a minute)
+.venv/Scripts/python model_tabpfn.py   # TabPFN comparison (15 to 40 minutes on CPU the first time, then cached)
 .venv/Scripts/python build_report.py   # rebuild this report with the TabPFN results
 ```
 
-The pipeline is deterministic. One bug worth recording: results first changed between runs because DuckDB does not guarantee row order out of a parallel join, and row order decides which rows gradient boosting holds out for early stopping. Sorting the feature table fixed it.
+The pipeline is deterministic. One bug worth recording: results first changed between runs because DuckDB does not guarantee row order out of a parallel join, and row order decides which rows XGBoost holds out for early stopping. Sorting the feature table fixed it.

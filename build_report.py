@@ -307,6 +307,116 @@ def fig_tabpfn(alt: dict) -> str:
     return save(fig, "10_tabpfn.png")
 
 
+def fig_ltv_projection(ltv: dict) -> str:
+    fig, ax = plt.subplots(figsize=(10, 4.8))
+    months = np.arange(1, 37)
+    ends = []
+    for r in ltv["projection"]:
+        c, col = r["channel"], CH_COLORS[r["channel"]]
+        cum, lo, hi = np.array(r["cum_curve"]), np.array(r["cum_lo"]), np.array(r["cum_hi"])
+        ax.plot(months[:12], np.array(r["actual_cum"]), color=col, lw=2.4)
+        ax.plot(months[11:], cum[11:], color=col, lw=2, ls="--")
+        ax.fill_between(months[11:], lo[11:], hi[11:], color=col, alpha=0.12, lw=0)
+        ax.hlines(r["cac"], 1, 36, color=col, lw=0.9, ls=":")
+        ends.append((cum[-1], c))
+    ends.sort()
+    placed = []
+    for y_end, c in ends:
+        y_lab = max(y_end, placed[-1][0] + 70) if placed else y_end
+        placed.append((y_lab, c))
+    for y_lab, c in placed:
+        ax.annotate(nm(c), (36.4, y_lab), va="center", color=CH_COLORS[c], fontsize=10, annotation_clip=False)
+    ax.axvline(12, color=INK2, lw=0.8)
+    ax.text(12.3, ax.get_ylim()[1] * 0.96, "observed | projected", color=INK2, fontsize=9, va="top")
+    money_axis(ax)
+    ax.set_xlim(0.5, 41)
+    ax.set_xticks([1, 6, 12, 18, 24, 30, 36])
+    ax.set_xlabel("Month since first deposit")
+    ax.set_ylabel("Cumulative contribution per FTD")
+    ax.set_title("Projected LTV to 36 months (shaded band = 95% bootstrap interval, dotted line = CAC)")
+    return save(fig, "11_ltv_projection.png")
+
+
+def fig_ltv_backtest(ltv: dict) -> str:
+    fig, axes = plt.subplots(1, 2, figsize=(11, 3.8), sharey=True)
+    methods = [("err_sbg", "sBG decay model", ACCENT), ("err_run_rate", "Flat run rate", AMBER), ("err_stop", "Stop counting", "#9AA7B4")]
+    for ax, key, title in ((axes[0], "backtest_6_to_12", "Fit on months 1 to 6, predict month 12"),
+                           (axes[1], "backtest_12_to_18", "Fit on months 1 to 12, predict month 18")):
+        rows = ltv[key]["channels"]
+        order = [r for c in CH_COLORS for r in rows if r["channel"] == c]
+        x = np.arange(len(order))
+        for i, (m, label, col) in enumerate(methods):
+            ax.bar(x + (i - 1) * 0.26, [r[m] for r in order], width=0.26, color=col, label=label)
+        ax.axhline(0, color=INK, lw=0.8)
+        ax.set_xticks(x, [nm(r["channel"]) for r in order], fontsize=9)
+        ax.yaxis.set_major_formatter(mtick.PercentFormatter(1, decimals=0))
+        ax.set_title(title, fontsize=10.5)
+    axes[0].set_ylabel("Forecast error (predicted / actual - 1)")
+    fig.tight_layout()
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="upper center", ncol=3, fontsize=9.5, bbox_to_anchor=(0.5, 1.07))
+    return save(fig, "12_ltv_backtest.png")
+
+
+def fig_power(exp: dict) -> str:
+    a, b = exp["offer_test"], exp["retention_test"]
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(11, 3.9))
+    t = pd.DataFrame(a["table"])
+    a1.plot(t.mde, t.raw, color=LOSS, marker="o", ms=4, lw=2, label="Raw outcome")
+    a1.plot(t.mde, t.winsor, color=ACCENT, marker="o", ms=4, lw=2, label="Winsorized at 99th pct")
+    a1.axvline(a["observed_gap_180"], color=INK2, lw=1, ls="--")
+    a1.text(a["observed_gap_180"] * 1.04, t.raw.max() * 0.5, f"expected gap\n${a['observed_gap_180']:.0f}", fontsize=9, color=INK2)
+    a1.set_xscale("log"); a1.set_yscale("log")
+    a1.set_xticks(t.mde, [f"${m}" for m in t.mde])
+    a1.yaxis.set_major_formatter(mtick.FuncFormatter(lambda v, _: f"{v:,.0f}"))
+    a1.yaxis.set_minor_formatter(mtick.NullFormatter())
+    a1.set_xlabel("Minimum detectable effect, 180-day contribution per FTD")
+    a1.set_ylabel("FTDs needed per arm")
+    a1.set_title("Welcome-offer test: sample size (5% alpha, 80% power)", fontsize=10.5)
+    a1.legend(fontsize=9)
+    bins = np.linspace(-80, 80, 41)
+    for k, label, col in (("raw", "Difference in means", "#9AA7B4"), ("cuped", "CUPED", ACCENT)):
+        a2.hist(b["split_diffs"][k], bins=bins, color=col, alpha=0.65, label=f"{label} (SD {b['empirical_sd_of_estimate'][k]:.1f})")
+    a2.set_xlabel("Estimated effect on 1,000 random splits with no true effect ($)")
+    a2.set_ylabel("Splits")
+    a2.set_title("Retention test: CUPED narrows the estimate", fontsize=10.5)
+    a2.legend(fontsize=9)
+    fig.tight_layout()
+    return save(fig, "13_test_design.png")
+
+
+def fig_calibration(model: dict) -> str:
+    c = model["calibration"]
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(11, 4))
+    a1.plot([0, 1], [0, 1], color=INK2, lw=1, ls="--")
+    for k, label, col in (("xgboost", "XGBoost", ACCENT), ("logistic", "Logistic regression", AMBER)):
+        bins = c[k]["bins"]
+        a1.plot([x["pred"] for x in bins], [x["actual"] for x in bins], marker="o", ms=5, lw=1.8, color=col,
+                label=f"{label} (Brier {c[k]['brier']:.3f})")
+    a1.set_xlim(0.15, 1); a1.set_ylim(0.15, 1)
+    a1.xaxis.set_major_formatter(mtick.PercentFormatter(1, decimals=0))
+    a1.yaxis.set_major_formatter(mtick.PercentFormatter(1, decimals=0))
+    a1.set_xlabel("Predicted probability of betting in month 3 (decile mean)")
+    a1.set_ylabel("Actual share")
+    a1.set_title("Retention model calibration", fontsize=10.5)
+    a1.legend(fontsize=9, loc="upper left")
+    sq = pd.DataFrame(model["value"]["deciles"]); tp = pd.DataFrame(model["value_two_part"]["deciles"])
+    lim = [min(sq.actual.min(), tp.predicted.min(), sq.predicted.min()) - 60, max(sq.actual.max(), tp.actual.max()) * 1.25]
+    a2.plot(lim, lim, color=INK2, lw=1, ls="--")
+    a2.scatter(sq.predicted, sq.actual, color="#9AA7B4", s=40, label="Squared-error XGBoost", zorder=3)
+    a2.scatter(tp.predicted, tp.actual, color=ACCENT, s=40, label="Two-part XGBoost", zorder=3)
+    a2.set_xscale("symlog", linthresh=100); a2.set_yscale("symlog", linthresh=100)
+    for ax_ in (a2.xaxis, a2.yaxis):
+        ax_.set_major_formatter(mtick.FuncFormatter(lambda v, _: usd(v)))
+        ax_.set_minor_formatter(mtick.NullFormatter())
+    a2.set_xlabel("Predicted 180-day contribution (decile mean, symlog scale)")
+    a2.set_ylabel("Actual")
+    a2.set_title("Value model calibration by decile", fontsize=10.5)
+    a2.legend(fontsize=9, loc="upper left")
+    fig.tight_layout()
+    return save(fig, "14_calibration.png")
+
+
 # ---------------------------------------------------------------------------
 # Report
 # ---------------------------------------------------------------------------
@@ -373,9 +483,23 @@ def main() -> None:
         "ret": fig_retention(ret),
         "ret2": fig_retention_split(ret_ch, cv, ch_order),
         "model": fig_deciles(model),
+        "calib": fig_calibration(model),
     }
     if alt:
         figs["tabpfn"] = fig_tabpfn(alt)
+    ltv = json.loads((OUT / "ltv_forecast.json").read_text())
+    exp = json.loads((OUT / "experiment_design.json").read_text())
+    figs["ltv"] = fig_ltv_projection(ltv)
+    figs["ltv_bt"] = fig_ltv_backtest(ltv)
+    figs["power"] = fig_power(exp)
+    tp = model["value_two_part"]
+    cal = model["calibration"]
+    bt1, bt2 = ltv["backtest_6_to_12"], ltv["backtest_12_to_18"]
+    proj = {p_["channel"]: p_ for p_ in ltv["projection"]}
+    ea, eb = exp["offer_test"], exp["retention_test"]
+    n_gap_w = ea["n_observed_gap"]["winsor"]
+    months_all = 2 * n_gap_w / ea["ftds_per_month_all_channels"]
+    months_ps = 2 * n_gap_w / ea["ftds_per_month_paid_social"]
 
     md: list[str] = []
     add = md.append
@@ -416,12 +540,16 @@ def main() -> None:
         f"filings in New York. Year-one contribution averages {usd(blended_ltv)} per FTD against a blended CAC of "
         f"{usd(blended_cac)}, a {blended_ltv / blended_cac:.2f}× return, but value is highly concentrated: the top 1% of "
         f"FTDs produce {pct(top(1))} of it and {pct(net_neg)} are net negative at day 180. Channel, welcome offer, and state "
-        f"tax each move payback materially. A gradient boosting model on the first 14 days of activity ranks players' "
+        f"tax each move payback materially. An XGBoost model on the first 14 days of activity ranks players' "
         f"180-day value with a Spearman correlation of {v['spearman_model']:.2f}, against {v['spearman_heuristic']:.2f} "
-        f"for sorting by early handle alone."
+        f"for sorting by early handle alone, and a two-part version improves that to {tp['spearman_model']:.2f} while "
+        f"fixing most of the model's under-prediction for top players. A retention-decay model, backtested within "
+        f"{abs(bt1['overall_err']['sbg']):.0%} of actual 12-month value from six months of data, projects 36-month returns "
+        f"of {ltv['projection'][-1]['ratio_36']:.1f}× to {ltv['projection'][0]['ratio_36']:.1f}× CAC across channels. The "
+        f"report also sizes the experiments needed to act on its recommendations."
         + (f" A separate section tests TabPFN, a pretrained tabular foundation model. Given {alt['n_context']:,} training "
            f"players and no tuning, it ranks 180-day value at {alt['models'][0]['spearman']:.2f} Spearman, better than "
-           f"gradient boosting trained on all {int(alt['models'][2]['name'].split(', ')[1].split()[0].replace(',', '')):,}, "
+           f"XGBoost trained on all {int(alt['models'][2]['name'].split(', ')[1].split()[0].replace(',', '')):,}, "
            f"and comes within {abs(alt['models'][0]['auc'] - alt['models'][2]['auc']):.3f} AUC of it on retention."
            if alt and alt["models"][0]["spearman"] > alt["models"][2]["spearman"] else
            f" A separate section tests TabPFN, a pretrained tabular foundation model, which reaches "
@@ -447,9 +575,10 @@ def main() -> None:
         "1. [Objective](#1-objective)", "2. [Data collection](#2-data-collection)",
         "3. [Data cleaning and transformation](#3-data-cleaning-and-transformation)",
         "4. [Exploratory data analysis](#4-exploratory-data-analysis)", "5. [Feature engineering](#5-feature-engineering)",
-        "6. [Modeling choices](#6-modeling-choices)", "7. [Findings](#7-findings)", "8. [Conclusion](#8-conclusion)",
-        "9. [TabPFN: process and comparison](#9-tabpfn-process-and-comparison)",
-        "10. [Reproducibility](#10-reproducibility)",
+        "6. [Modeling choices](#6-modeling-choices)", "7. [Findings](#7-findings)",
+        "8. [Test design for the recommended changes](#8-test-design-for-the-recommended-changes)",
+        "9. [Conclusion](#9-conclusion)", "10. [TabPFN: process and comparison](#10-tabpfn-process-and-comparison)",
+        "11. [Reproducibility](#11-reproducibility)",
     ]) + "\n")
 
     # ---- 1. Objective -------------------------------------------------------
@@ -539,7 +668,7 @@ def main() -> None:
     add("```\ncontribution = GGR - welcome promo - ongoing promos - tax x (GGR - promos) - 0.6% x handle\n```\n")
     add(
         "It is a contribution margin, not profit: it excludes fixed costs and overhead. Tax is applied to GGR net of promos "
-        "as a simplification (section 8.3).\n"
+        "as a simplification (section 9.3).\n"
     )
 
     # ---- 4. EDA -------------------------------------------------------------
@@ -623,7 +752,7 @@ def main() -> None:
     add(
         "Transformations depend on the model. For logistic regression, numeric features get a signed log transform, "
         "`sign(x) * log(1 + |x|)`, to tame the heavy tails (GGR can be negative), then standardization, and categoricals "
-        "are one-hot encoded. Gradient boosting takes raw values and native categorical splits, since trees are invariant "
+        "are one-hot encoded. XGBoost takes raw values and native categorical splits, since trees are invariant "
         "to monotone transforms.\n"
     )
 
@@ -635,9 +764,11 @@ def main() -> None:
         f"information across the boundary, and in practice the model is fit on past cohorts and used on new ones.",
         "- **Baselines first.** Logistic regression for retention, and two naive rules for value: sort by 14-day handle, and "
         "predict the training mean.",
-        "- **Gradient boosting** (scikit-learn `HistGradientBoosting`) as the main model. It handles missing values, "
-        "categoricals, and interactions without manual work, and is the standard strong baseline for tabular data. Early "
-        "stopping on an internal validation split, learning rate 0.05.",
+        "- **XGBoost** as the main model: histogram trees with native categorical splits, which handle missing values, "
+        "categoricals, and interactions without manual work. It is the standard strong baseline for tabular data. "
+        "Settings: learning rate 0.03, max depth 6, minimum child weight 5, row and column subsampling of 0.8, and early "
+        "stopping after 100 rounds without improvement on a held-out 10% of the training rows, so the number of trees is "
+        "chosen by validation. Squared-error objective for value, log loss for retention.",
         "- **Metrics chosen for the skew.** AUC for retention (ranking quality, insensitive to the threshold). For value, "
         "Spearman rank correlation and top-decile lift, because the business action is ranking players and a few whales "
         "dominate any squared-error metric. Mean absolute error is reported for completeness.",
@@ -645,6 +776,22 @@ def main() -> None:
         "and is less biased toward high-cardinality features than split-based importance.",
         "- **Bootstrap intervals** for channel LTV/CAC: 2,000 resamples of players within each channel, 95% percentile "
         "intervals. Given the skew in 4.2, point estimates alone would overstate precision.",
+        "- **A two-part value model** as a second specification, because squared-error loss shrinks a heavy right tail. "
+        "One XGBoost classifier estimates the chance a player ends up profitable. A second XGBoost model predicts "
+        "log(1 + value) for profitable players, converted back to dollars with Duan's smearing correction estimated on "
+        "held-out rows. A third predicts the size of the loss for unprofitable players. Expected value is "
+        "p × E[value | profitable] + (1 − p) × E[value | not profitable].",
+        "- **Calibration checks.** Brier score and reliability curves (predicted probability against the actual share, by "
+        "decile) for the retention models, and predicted against actual value by decile for the value models. Ranking "
+        "metrics say nothing about whether a predicted $500 is really $500, and bids are set in dollars.",
+        "- **Lifetime value beyond the observed window** with a shifted-beta-geometric (sBG) retention curve per channel: "
+        "the share of FTDs still betting in month t is S(t) = B(a, b + t) / B(a, b), which allows churn to differ across "
+        "players and gives the long, slow-decaying tail a single churn rate cannot. Projected contribution is S(t) times "
+        "the value of an active player (the average of the last three observed months). The method is backtested twice "
+        "on held-out months before it is used, with bootstrap intervals on the projections.",
+        "- **Test design** for the recommended changes: sample size per arm at 5% significance and 80% power, "
+        "winsorizing the outcome at the 99th percentile to tame the tail, and CUPED or regression adjustment on "
+        "pre-treatment covariates to reduce variance.",
     ]) + "\n")
 
     # ---- 7. Findings --------------------------------------------------------
@@ -659,21 +806,52 @@ def main() -> None:
         ["Find the top decile", "Lift over average", f"{td['lift']:.2f}×", f"{th['lift']:.2f}× (sort by 14-day handle)"],
         ["Predict dollar value", "Mean absolute error", usd(v["mae_model"]), f"{usd(v['mae_predict_mean'])} (predict the mean)"],
         ["Find hidden high-value players", "Share of top decile", pct(v["hidden_high_value_share_top_decile"]), f"{pct(v['hidden_high_value_share_all'])} (base rate)"],
-    ], columns=["Question", "Metric", "Gradient boosting", "Baseline"]), "llrl") + "\n")
+    ], columns=["Question", "Metric", "XGBoost", "Baseline"]), "llrl") + "\n")
     top_pred = v["deciles"][0]
     add("\n".join([
-        f"- On retention, logistic regression matches gradient boosting ({r['auc_logistic']:.3f} vs {r['auc_gbm']:.3f} "
+        f"- On retention, logistic regression matches XGBoost ({r['auc_logistic']:.3f} vs {r['auc_gbm']:.3f} "
         f"AUC). The simpler model is the one to ship there.",
-        f"- On value, gradient boosting ranks the whole base better than early handle alone ({v['spearman_model']:.2f} vs "
+        f"- On value, XGBoost ranks the whole base better than early handle alone ({v['spearman_model']:.2f} vs "
         f"{v['spearman_heuristic']:.2f}), but ties it on the top decile. Use the model for bids and retention spend across "
         f"everyone, and a handle threshold for routing likely high-value players to VIP.",
-        f"- The value model is biased low at the top: it predicts {usd(top_pred['predicted'])} for its top decile, which "
-        f"actually averages {usd(top_pred['actual'])}. Squared-error loss shrinks a heavy right tail. Modeling log value or "
-        f"recalibrating the top decile would fix it before anyone sets bids from it.",
+        f"- The squared-error value model is biased low at the top: it predicts {usd(top_pred['predicted'])} for its top "
+        f"decile, which actually averages {usd(top_pred['actual'])}. The two-part model below addresses this.",
         f"- {pct(v['hidden_high_value_share_top_decile'])} of the model's top decile are truly high-value players, against a "
         f"{pct(v['hidden_high_value_share_all'])} base rate, which confirms it is finding the right people rather than "
         f"fitting noise.",
     ]) + "\n")
+    tp_top = tp["deciles"][0]
+    add("**Two-part value model.** Same features, same split, three XGBoost models combined as described in section 6.\n")
+    add(table(pd.DataFrame([
+        ["Top-decile prediction ÷ actual", f"{top_pred['predicted'] / top_pred['actual']:.2f}",
+         f"{tp_top['predicted'] / tp_top['actual']:.2f}"],
+        ["Spearman, 180-day value", f"{v['spearman_model']:.3f}", f"{tp['spearman_model']:.3f}"],
+        ["Mean absolute error", usd(v["mae_model"]), usd(tp["mae_model"])],
+        ["Top-decile lift", f"{v['top_decile_model']['lift']:.2f}×", f"{tp['top_decile_model']['lift']:.2f}×"],
+        ["High-value share of top decile", pct(v["hidden_high_value_share_top_decile"]),
+         pct(tp["hidden_high_value_share_top_decile"])],
+    ], columns=["Metric", "Squared-error XGBoost", "Two-part XGBoost"]), "lrr") + "\n")
+    add(
+        f"The two-part model closes much of the gap at the top, from {top_pred['predicted'] / top_pred['actual']:.2f} to "
+        f"{tp_top['predicted'] / tp_top['actual']:.2f} of the actual top-decile value, and improves ranking and average "
+        f"error, while finding about the same share of true high-value players. Its classifier separates eventually profitable players at "
+        f"{tp['auc_profitable']:.3f} AUC. The smearing factor of {tp['smearing_factor']:.2f} is large, which says the "
+        f"log-scale residuals are wide: individual predictions are noisy even when decile averages are right. Both value "
+        f"models predict a lower average than the test cohorts actually produced "
+        f"({usd(tp['mean_predicted'])} against {usd(v['mean_actual'])}), so predicted dollars should be recalibrated on "
+        f"recent cohorts before being used as bids.\n"
+    )
+    add(f"![Calibration]({figs['calib']})\n")
+    x_bins = cal["xgboost"]["bins"]
+    add(
+        f"**Calibration.** Both retention models beat the base rate on Brier score ({cal['xgboost']['brier']:.3f} for "
+        f"XGBoost, {cal['logistic']['brier']:.3f} for logistic regression, {cal['brier_base_rate']:.3f} for predicting "
+        f"the training average). XGBoost's probabilities are slightly compressed: its lowest decile predicts "
+        f"{pct(x_bins[0]['pred'])} and sees {pct(x_bins[0]['actual'])}, and its highest predicts {pct(x_bins[-1]['pred'])} "
+        f"and sees {pct(x_bins[-1]['actual'])}. Logistic regression tracks the diagonal more closely, which is one more "
+        f"reason to prefer it for retention scoring. On value, the two-part model's deciles sit close to the diagonal "
+        f"while the squared-error model's sit below it.\n"
+    )
     add("### 7.2 Channel economics\n")
     add(f"![Payback by channel]({figs['payback']})\n")
     t = pd.DataFrame([{
@@ -728,28 +906,137 @@ def main() -> None:
         rows.append(row)
     add(table(pd.DataFrame(rows), "l" + "r" * len(order_states)) + "\n")
 
-    # ---- 8. Conclusion -----------------------------------------------------
-    add("## 8. Conclusion\n")
-    add("### 8.1 Summary\n")
+    add("### 7.5 Lifetime value beyond 12 months\n")
+    add(
+        "Twelve months understates what a player is worth, because a meaningful share are still betting at month 12. "
+        "Before projecting further, I tested the projection method on months it never saw.\n"
+    )
+    add(f"![LTV backtest]({figs['ltv_bt']})\n")
+    add(table(pd.DataFrame([
+        [f"Fit months 1 to 6, predict month 12 ({sum(r_['ftds'] for r_ in bt1['channels']):,} FTDs)",
+         f"{bt1['overall_err']['sbg']:+.1%}", f"{bt1['overall_err']['run_rate']:+.1%}", f"{bt1['overall_err']['stop']:+.1%}",
+         f"{bt1['mean_abs_channel_err']['sbg']:.1%}"],
+        [f"Fit months 1 to 12, predict month 18 ({sum(r_['ftds'] for r_ in bt2['channels']):,} FTDs)",
+         f"{bt2['overall_err']['sbg']:+.1%}", f"{bt2['overall_err']['run_rate']:+.1%}", f"{bt2['overall_err']['stop']:+.1%}",
+         f"{bt2['mean_abs_channel_err']['sbg']:.1%}"],
+    ], columns=["Backtest", "sBG decay model", "Flat run rate", "Stop counting", "sBG, mean channel error"]), "lrrrr") + "\n")
+    add(
+        f"Early on, the decay model is clearly best: from six months of data it lands {bt1['overall_err']['sbg']:+.1%} "
+        f"from the actual 12-month value, where a flat run rate overshoots by {bt1['overall_err']['run_rate']:+.1%} and "
+        f"ignoring the future misses by {bt1['overall_err']['stop']:+.1%}. By month 12, value per player has flattened "
+        f"enough that a flat run rate does about as well over the next six months "
+        f"({bt2['overall_err']['run_rate']:+.1%} against {bt2['overall_err']['sbg']:+.1%}). But a run rate never decays, so "
+        f"it cannot be stretched to 36 months. The decay model can, and its backtest errors bound how far to trust it.\n"
+    )
+    add(f"![LTV projection]({figs['ltv']})\n")
+    add(table(pd.DataFrame([{
+        "Channel": nm(r_["channel"]), "CAC": usd(r_["cac"]), "12-mo LTV": usd(r_["ltv_12"]),
+        "24-mo LTV": f"{usd(r_['ltv_24'])} ({usd(r_['ltv_24_lo'])} to {usd(r_['ltv_24_hi'])})",
+        "36-mo LTV": f"{usd(r_['ltv_36'])} ({usd(r_['ltv_36_lo'])} to {usd(r_['ltv_36_hi'])})",
+        "36-mo LTV / CAC": f"{r_['ratio_36']:.2f}× ({r_['ratio_36_lo']:.2f} to {r_['ratio_36_hi']:.2f})",
+        "Still betting, month 36": pct(r_["survival_36"]),
+    } for r_ in ltv["projection"]]), "lrrrrrr") + "\n")
+    p_best, p_worst = ltv["projection"][0], ltv["projection"][-1]
+    rank12 = [c_ for c_ in ch_order]
+    rank36 = [r_["channel"] for r_ in ltv["projection"]]
+    add(
+        f"Projected to 36 months, returns range from {p_best['ratio_36']:.1f}× for {nm(p_best['channel']).lower()} to "
+        f"{p_worst['ratio_36']:.1f}× for {nm(p_worst['channel']).lower()}. "
+        + ("The channel ranking is the same as at 12 months. " if rank12 == rank36 else
+           "The ranking shifts slightly from the 12-month view, because channels with more high-value players keep "
+           "accruing value for longer. ")
+        + "The practical use is setting CAC targets: a team that requires payback inside 12 months is leaving value on "
+        "the table for channels whose players keep betting, and the intervals show how much of that value is reliable. "
+        "The projection holds value per active player flat and assumes churned players never return. The later "
+        f"backtest came in {abs(bt2['overall_err']['sbg']):.0%} low, which suggests the long-run numbers lean conservative, "
+        "but beyond 18 months they are untested.\n"
+    )
+
+    # ---- 8. Test design ----------------------------------------------------
+    add("## 8. Test design for the recommended changes\n")
+    add(
+        "Two recommendations need experiments before anyone acts on them: switching the welcome offer, and targeting "
+        "retention spend with the model. This section sizes both tests. The two cases differ in one important way: "
+        "what the analysis is allowed to adjust for.\n"
+    )
+    add(f"![Test design]({figs['power']})\n")
+    add("### 8.1 Welcome-offer test\n")
+    add(
+        f"New depositors would be randomized at signup between the no-sweat offer and bet $5 get $200, with 180-day "
+        f"contribution as the outcome. The expected difference, from the simulation, is {usd(ea['observed_gap_180'])} per "
+        f"FTD. The outcome's standard deviation is {usd(ea['sd'])}, seven times its mean, so a plain test is expensive.\n"
+    )
+    add(table(pd.DataFrame([{
+        "Minimum detectable effect": usd(row_["mde"]), "Raw outcome": f"{row_['raw']:,}",
+        "Winsorized at 99th pct": f"{row_['winsor']:,}", "Winsorized and adjusted": f"{row_['winsor_adjusted']:,}",
+    } for row_ in ea["table"] if row_["mde"] in (25, 50, 100, 150)]), "lrrr") + "\n")
+    add("\n".join([
+        f"- **Winsorizing** the outcome at the 99th percentile ({usd(ea['winsor_cap'])}) cuts the required sample by about "
+        f"{1 - ea['n_observed_gap']['winsor'] / ea['n_observed_gap']['raw']:.0%}: to detect the expected "
+        f"{usd(ea['observed_gap_180'])} gap, {ea['n_observed_gap']['winsor']:,} FTDs per arm instead of "
+        f"{ea['n_observed_gap']['raw']:,}. The cost is a slightly different estimand, the effect on capped value, which "
+        "should be stated up front.",
+        f"- **Covariate adjustment barely helps here.** Only information known before randomization is allowed, which "
+        f"for a new signup means channel, state, and signup month. Together they explain {pct(ea['r2_pre_signup_winsor'], 1)} "
+        f"of the variance.",
+        f"- **Early betting cannot be used as a covariate**, even though it would explain {pct(ea['r2_post_treatment_if_misused'])} "
+        "of the variance. The offer changes how people bet in their first two weeks, so adjusting for that behavior would "
+        "absorb part of the very effect being measured.",
+        f"- **Duration.** {2 * ea['n_observed_gap']['winsor']:,} FTDs in total is about {months_all:.1f} months of signups "
+        f"across all channels, or {months_ps:.1f} months of paid social alone, plus 180 days to observe the outcome. The "
+        "day-14 value model could provide an early read, but only as a leading indicator, not as the decision metric.",
+    ]) + "\n")
+    add("### 8.2 Retention-spend test\n")
+    add(
+        f"Existing players who bet in month 3 would be randomized to receive a retention offer or not at the start of "
+        f"month 4, with contribution in months 4 to 9 as the outcome ({eb['n_players']:,} such players in the data). "
+        f"Here the first three months happened before randomization, so they are valid covariates. CUPED adjusts each "
+        f"player's outcome by their pre-period contribution; regression adjustment uses several pre-period measures.\n"
+    )
+    add(table(pd.DataFrame([
+        ["CUPED, pre-period contribution", pct(eb["var_reduction_cuped"]), pct(eb["empirical_var_reduction"]["cuped"])],
+        ["Regression, four pre-period measures", pct(eb["r2_multi"]), pct(eb["empirical_var_reduction"]["regression"])],
+    ], columns=["Adjustment", "Variance reduction, formula", "Variance reduction, 1,000 random splits"]), "lrr") + "\n")
+    add(table(pd.DataFrame([{
+        "Minimum detectable effect": usd(row_["mde"]), "Unadjusted": f"{row_['raw']:,}",
+        "CUPED": f"{row_['cuped']:,}", "Regression": f"{row_['regression']:,}",
+    } for row_ in eb["table"] if row_["mde"] in (25, 50, 100, 150)]), "lrrr") + "\n")
+    add(
+        f"The formula and the simulation agree: adjusting for the pre-period cuts variance by about a fifth, which cuts "
+        f"the required sample by the same share. The right panel of the figure shows it directly. Across 1,000 random "
+        f"splits with no true effect, the CUPED estimate's standard deviation is "
+        f"{usd(eb['empirical_sd_of_estimate']['cuped'])} against {usd(eb['empirical_sd_of_estimate']['raw'])} for a plain "
+        f"difference in means. Adding a covariate is free once the data exists, so there is no reason to run this test "
+        f"without it.\n"
+    )
+
+    # ---- 9. Conclusion -----------------------------------------------------
+    add("## 9. Conclusion\n")
+    add("### 9.1 Summary\n")
     add(
         f"An FTD in this simulation returns {blended_ltv / blended_cac:.2f}× its acquisition cost in year one, but that "
         f"average hides extreme concentration: {pct(top(1))} of contribution comes from 1% of players and most players "
         f"lose money after promos. The biggest levers are which channel a player comes from, which offer they receive, "
         f"and which state they bet in. Two weeks of behavior is enough to rank players usefully, and a simple model on "
-        f"those two weeks ranks them better than early handle alone. Section 9 tests a pretrained tabular model, TabPFN, "
+        f"those two weeks ranks them better than early handle alone, especially with a two-part model. Projected with a "
+        f"retention-decay model that backtests within a few percent, 36-month returns run from "
+        f"{ltv['projection'][-1]['ratio_36']:.1f}× to {ltv['projection'][0]['ratio_36']:.1f}× CAC. Section 10 tests a pretrained tabular model, TabPFN, "
         f"on the same problem.\n"
     )
-    add("### 8.2 Recommendations\n")
+    add("### 9.2 Recommendations\n")
     add("\n".join(f"{i}. {t_}" for i, t_ in enumerate([
-        f"Test the no-sweat offer against bet $5 get $200 in {nm(worst.channel).lower()}, with a holdout, before changing "
-        f"that channel's budget.",
-        "Set acquisition bid caps by state (7.4) rather than one national CAC target.",
-        "Score every FTD at day 14. Use the value model for retention spend across the whole base, and a handle threshold "
-        "to route likely high-value players to VIP.",
+        f"Test the no-sweat offer against bet $5 get $200 before changing any channel's budget: about "
+        f"{ea['n_observed_gap']['winsor']:,} FTDs per arm with a winsorized outcome (section 8.1).",
+        "Set acquisition bid caps by state (7.4) rather than one national CAC target, and base them on projected rather "
+        "than 12-month value where the backtest supports it (7.5).",
+        "Score every FTD at day 14 with the two-part value model, recalibrated on recent cohorts, for retention spend "
+        "across the whole base. Use a handle threshold to route likely high-value players to VIP.",
+        "Run the retention-spend test with CUPED on pre-period contribution; it cuts the required sample by about a fifth "
+        "(section 8.2).",
         "Report channel LTV with an interval. With value this concentrated, a few players can move a channel's average.",
-        "Use logistic regression for retention scoring: it matches gradient boosting and is easier to explain.",
+        "Use logistic regression for retention scoring: it matches XGBoost and is easier to explain.",
     ], 1)) + "\n")
-    add("### 8.3 Limitations\n")
+    add("### 9.3 Limitations\n")
     add("\n".join(f"- {t_}" for t_ in [
         "Player-level data is simulated. Channel, offer, and player-type effects come from my assumptions, so conclusions "
         "about them demonstrate the method rather than describe real DraftKings economics.",
@@ -758,11 +1045,15 @@ def main() -> None:
         "Tax is a flat rate on GGR net of promos. Real states tier it, tax per wager, or limit promo deductions, and the "
         "non-New York rates are approximate.",
         "No casino or daily fantasy cross-sell, and churned players never return.",
+        "LTV projections beyond 18 months are extrapolations. The backtests cover 6 to 12 and 12 to 18 months only, and "
+        "the projection holds value per active player flat.",
+        "Sample sizes assume the simulated variance. Real outcome variance, and so the real required sample, should be "
+        "measured on recent cohorts before a test launches.",
     ]) + "\n")
 
     # ---- 9. TabPFN ---------------------------------------------------------
-    add("## 9. TabPFN: process and comparison\n")
-    add("### 9.1 What TabPFN is\n")
+    add("## 10. TabPFN: process and comparison\n")
+    add("### 10.1 What TabPFN is\n")
     add(
         "TabPFN (Hollmann et al., *Nature*, 2025) is a transformer pretrained by Prior Labs on millions of synthetic "
         "datasets drawn from a prior over how tabular data is generated: random causal structures, noise, missing values, "
@@ -775,7 +1066,7 @@ def main() -> None:
         "tune a model well. That is a common situation in customer economics: a new state launch, a new promotion, or a "
         "new product, with a few thousand players and a decision due before more data arrives.\n"
     )
-    add("### 9.2 Setup\n")
+    add("### 10.2 Setup\n")
     add("\n".join([
         "- **Model version.** The open TabPFN v2 weights from Hugging Face (`Prior-Labs/TabPFN-v2-clf` and `-reg`), loaded "
         "through the `tabpfn` package. Newer versions (3.5) require an account and license acceptance for local use, so I "
@@ -792,15 +1083,16 @@ def main() -> None:
         "preprocessing, averaged.",
         "- **CPU.** TabPFN refuses CPU runs above 1,000 rows by default because they are slow, so I set "
         "`ignore_pretraining_limits=True` and predicted in batches of 1,000."
-        + (f" Scoring the test set took about {secs.get('retention', 0) // 60} minutes for retention and "
-           f"{secs.get('value', 0) // 60} minutes for value." if secs else ""),
+        + " Scoring the 6,754 test players took between about 7 and 25 minutes per model across my runs, depending on "
+          "what else the laptop was doing. The predictions are cached so the comparison can be rebuilt without rerunning "
+          "TabPFN.",
     ]) + "\n")
     add(
         "To separate the effect of the model from the effect of less data, I compared three setups on the same test "
-        "players: TabPFN on the 3,000-player sample, gradient boosting on the same 3,000, and gradient boosting on the full "
+        "players: TabPFN on the 3,000-player sample, XGBoost on the same 3,000, and XGBoost on the full "
         "training set.\n"
     )
-    add("### 9.3 Results\n")
+    add("### 10.3 Results\n")
     if alt:
         a0, a1, a2 = alt["models"]
         add(f"![TabPFN comparison]({figs['tabpfn']})\n")
@@ -819,31 +1111,40 @@ def main() -> None:
             vs_full = f"TabPFN is within {abs(full):.3f}"
         else:
             vs_full = f"TabPFN trails by {abs(full):.3f}"
-        add("### 9.4 Interpretation\n")
+        add("### 10.4 Interpretation\n")
         add("\n".join([
-            f"- **At equal data**, TabPFN {'beats' if same > 0 else 'trails'} gradient boosting on retention by "
+            f"- **At equal data**, TabPFN {'beats' if same > 0 else 'trails'} XGBoost on retention by "
             f"{abs(same):.3f} AUC, and ranks 180-day value at {a0['spearman']:.3f} Spearman against {a1['spearman']:.3f}.",
-            f"- **Against {ratio}× the data**, gradient boosting on {n_full:,} players: {vs_full} on retention AUC, and "
+            f"- **Against {ratio}× the data**, XGBoost on {n_full:,} players: {vs_full} on retention AUC, and "
             f"scores {a0['spearman']:.3f} against {a2['spearman']:.3f} on value ranking"
             + (". On value ranking, the model with a tenth of the data is the best of the three." if a0["spearman"] > a2["spearman"] else "."),
-            "- **Why value ranking goes this way.** Gradient boosting with squared-error loss spends its capacity fitting "
-            f"the few very large players, and its ranking of everyone else does not improve with more data "
-            f"({a1['spearman']:.3f} on {alt['n_context']:,} players, {a2['spearman']:.3f} on all of them). TabPFN predicts "
-            "from a learned prior over tables rather than minimizing squared "
-            "error on this one, which seems to make it less sensitive to the tail. Modeling log value with gradient boosting "
-            "would be the fair next comparison."
-            if a1["spearman"] > a2["spearman"] else
-            "- **Value ranking.** TabPFN's advantage holds across the distribution, not just the top decile.",
+            ("- **Why value ranking goes this way.** XGBoost with squared-error loss spends much of its capacity fitting "
+             f"the few very large players, so its ranking of everyone else gains little from more data "
+             f"({a1['spearman']:.3f} on {alt['n_context']:,} players, {a2['spearman']:.3f} on all of them). TabPFN predicts "
+             "from a learned prior over tables rather than minimizing squared error on this one, which seems to make it "
+             "less sensitive to the tail. Modeling log value with XGBoost would be the fair next comparison."
+             if a0["spearman"] > a2["spearman"] else
+             f"- **Value ranking.** With enough data XGBoost catches up ({a2['spearman']:.3f} against TabPFN's "
+             f"{a0['spearman']:.3f}), so TabPFN's advantage is specific to the small-sample case."),
+            f"- **Against the two-part model.** Fixing XGBoost's loss (section 7.1) lifts its value ranking to "
+            f"{tp['spearman_model']:.3f} on the full data, which narrows but does not close the gap to TabPFN's "
+            f"{a0['spearman']:.3f}. Part of TabPFN's edge was the loss function; part of it was not."
+            if a0["spearman"] > tp["spearman_model"] else
+            f"- **Against the two-part model.** Fixing XGBoost's loss (section 7.1) lifts its value ranking to "
+            f"{tp['spearman_model']:.3f}, level with or above TabPFN's {a0['spearman']:.3f}. Most of TabPFN's edge was "
+            f"the loss function.",
             f"- **Finding the top players.** Top-decile lift is nearly identical across all three ({a0['top_decile_lift']:.2f}×, "
-            f"{a1['top_decile_lift']:.2f}×, {a2['top_decile_lift']:.2f}×), and the full-data model recovers slightly more of the "
-            f"hidden high-value players ({pct(a2['hidden_high_value_share_top_decile'])} vs "
-            f"{pct(a0['hidden_high_value_share_top_decile'])}). TabPFN's edge is in ranking the middle of the base.",
-            "- **Cost.** Gradient boosting trains and scores in seconds. TabPFN needed minutes per model on CPU, because every "
+            f"{a1['top_decile_lift']:.2f}×, {a2['top_decile_lift']:.2f}×). The share of true high-value players in each "
+            f"model's top decile is {pct(a0['hidden_high_value_share_top_decile'])}, "
+            f"{pct(a1['hidden_high_value_share_top_decile'])}, and {pct(a2['hidden_high_value_share_top_decile'])}.",
+            "- **Cost.** XGBoost trains and scores in seconds. TabPFN needed minutes per model on CPU, because every "
             "prediction attends over the whole context. At production scale it wants a GPU or Prior Labs' hosted API.",
             "- **Where I'd use it.** First, small-sample questions where there is no time or data to tune a model: early "
-            "reads on a new state, offer, or product. Second, as a benchmark. Its value-ranking result here says the "
-            "full-data gradient boosting model is leaving accuracy on the table, and the next step would be to fix that "
-            "model's loss rather than assume more data solves it.",
+            "reads on a new state, offer, or product."
+            + (" Second, as a benchmark. Its value-ranking result says the full-data XGBoost model is leaving accuracy on "
+               "the table, and the next step would be to fix that model's loss rather than assume more data solves it."
+               if a0["spearman"] > a2["spearman"] else
+               " For a mature, data-rich problem like scoring every FTD, XGBoost is as accurate and far cheaper to run."),
         ]) + "\n")
     else:
         add("TabPFN results are not in `outputs/` yet. Run `python model_tabpfn.py`, then `python build_report.py`.\n")
@@ -853,11 +1154,11 @@ def main() -> None:
     )
 
     # ---- 10. Reproducibility -----------------------------------------------
-    add("## 10. Reproducibility\n")
-    add("```bash\npython -m venv .venv\n.venv/Scripts/pip install -r requirements.txt\n.venv/Scripts/python run.py            # simulate, SQL, models, report (about 30 seconds)\n.venv/Scripts/python model_tabpfn.py   # TabPFN comparison (about 15 to 20 minutes on CPU)\n.venv/Scripts/python build_report.py   # rebuild this report with the TabPFN results\n```\n")
+    add("## 11. Reproducibility\n")
+    add("```bash\npython -m venv .venv\n.venv/Scripts/pip install -r requirements.txt\n.venv/Scripts/python run.py            # simulate, SQL, models, LTV projection, test design, report (under a minute)\n.venv/Scripts/python model_tabpfn.py   # TabPFN comparison (15 to 40 minutes on CPU the first time, then cached)\n.venv/Scripts/python build_report.py   # rebuild this report with the TabPFN results\n```\n")
     add(
         "The pipeline is deterministic. One bug worth recording: results first changed between runs because DuckDB does "
-        "not guarantee row order out of a parallel join, and row order decides which rows gradient boosting holds out for "
+        "not guarantee row order out of a parallel join, and row order decides which rows XGBoost holds out for "
         "early stopping. Sorting the feature table fixed it.\n"
     )
 

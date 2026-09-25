@@ -12,20 +12,20 @@
       "hidden_high_value_share_top_decile": 0.688
     },
     {
-      "name": "Gradient boosting, 3,000 players",
-      "auc": 0.726,
-      "spearman": 0.549,
-      "mae": 385.05,
-      "top_decile_lift": 10.15,
-      "hidden_high_value_share_top_decile": 0.645
+      "name": "XGBoost, 3,000 players",
+      "auc": 0.73,
+      "spearman": 0.56,
+      "mae": 388.27,
+      "top_decile_lift": 9.94,
+      "hidden_high_value_share_top_decile": 0.651
     },
     {
-      "name": "Gradient boosting, 33,246 players",
+      "name": "XGBoost, 33,246 players",
       "auc": 0.753,
-      "spearman": 0.519,
-      "mae": 379.11,
-      "top_decile_lift": 10.17,
-      "hidden_high_value_share_top_decile": 0.716
+      "spearman": 0.572,
+      "mae": 378.65,
+      "top_decile_lift": 10.2,
+      "hidden_high_value_share_top_decile": 0.72
     }
   ],
   "baseline_handle_only": {
