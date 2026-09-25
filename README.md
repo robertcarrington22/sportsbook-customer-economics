@@ -2,7 +2,7 @@
 
 CAC, lifetime value, payback, and early-value prediction for a US online sportsbook, built for the Analyst I, Customer Economics role at DraftKings.
 
-**Read the report: [REPORT.md](REPORT.md)**
+**Read the report: [REPORT.pdf](REPORT.pdf)** (typeset) or [REPORT.md](REPORT.md) (on GitHub)
 
 The player-level data is simulated, because no public sportsbook dataset has acquisition channels, CAC, or promo costs. Seasonality, hold, and hold volatility are calibrated to DraftKings' monthly filings with the New York State Gaming Commission. Everything else is an assumption in [`assumptions.toml`](assumptions.toml). None of it is DraftKings internal data.
 
@@ -23,6 +23,7 @@ analyze.py             runs sql/ in order, adds bootstrap intervals, writes outp
 model.py               gradient boosting and logistic regression
 model_tabpfn.py        TabPFN comparison (optional, about 20 minutes on CPU)
 build_report.py        writes REPORT.md and figures/
+make_pdf.py            typesets REPORT.md as REPORT.pdf (Windows, uses Edge)
 run.py                 simulate, analyze, model, report
 ```
 

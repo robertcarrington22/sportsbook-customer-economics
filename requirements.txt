@@ -6,6 +6,7 @@ pdfplumber==0.11.10
 pyarrow==25.0.1
 scikit-learn==1.9.1
 scipy==1.18.1
+markdown==3.9
 # Optional, for model_tabpfn.py
 tabpfn==9.0.0
 torch==2.14.0

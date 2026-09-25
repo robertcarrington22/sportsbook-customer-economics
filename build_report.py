@@ -32,7 +32,7 @@ NAMES = {
 }
 
 plt.rcParams.update({
-    "font.family": ["Segoe UI", "Arial", "DejaVu Sans"], "font.size": 10, "axes.edgecolor": "#C9CEC7",
+    "font.family": ["Times New Roman", "DejaVu Serif"], "font.size": 10.5, "axes.edgecolor": "#C9CEC7",
     "axes.labelcolor": INK2, "xtick.color": INK2, "ytick.color": INK2, "axes.spines.top": False,
     "axes.spines.right": False, "axes.grid": True, "grid.color": GRID, "grid.linewidth": 0.8,
     "axes.axisbelow": True, "text.parse_math": False, "axes.titlesize": 11, "axes.titleweight": "bold", "axes.titlecolor": INK,
@@ -127,7 +127,8 @@ def fig_concentration(conc: pd.DataFrame) -> str:
     for p in (1, 5, 10):
         y = conc.loc[conc.pctile == p, "cum_share_of_total"].iloc[0]
         ax.scatter([p], [y], color=ACCENT, zorder=3)
-        ax.annotate(f"top {p}%: {pct(y)}", (p, y), textcoords="offset points", xytext=(8, -14), fontsize=9, color=INK)
+        ax.annotate(f"top {p}%: {pct(y)}", (p, y), textcoords="offset points", xytext=(9, -3), va="center",
+                    fontsize=9.5, color=INK)
     ax.yaxis.set_major_formatter(mtick.PercentFormatter(1, decimals=0))
     ax.set_xlabel("Top X% of FTDs by year-one contribution")
     ax.set_ylabel("Share of total contribution")
