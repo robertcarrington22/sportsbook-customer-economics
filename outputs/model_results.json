@@ -1,0 +1,205 @@
+{
+  "split": {
+    "train_cohorts": "Sep 2024 to Apr 2025",
+    "test_cohorts": "May 2025 to Aug 2025",
+    "n_train": 33246,
+    "n_test": 6754
+  },
+  "retention": {
+    "base_rate_active_m3": 0.547,
+    "auc_logistic": 0.739,
+    "auc_gbm": 0.741,
+    "avg_precision_gbm": 0.784,
+    "lapse_rate_bottom_decile": 0.753,
+    "lapse_rate_all": 0.453,
+    "deciles": [
+      {
+        "decile": 1,
+        "predicted": 0.89,
+        "actual": 0.91,
+        "n": 676
+      },
+      {
+        "decile": 2,
+        "predicted": 0.82,
+        "actual": 0.84,
+        "n": 675
+      },
+      {
+        "decile": 3,
+        "predicted": 0.69,
+        "actual": 0.77,
+        "n": 675
+      },
+      {
+        "decile": 4,
+        "predicted": 0.55,
+        "actual": 0.58,
+        "n": 676
+      },
+      {
+        "decile": 5,
+        "predicted": 0.47,
+        "actual": 0.51,
+        "n": 675
+      },
+      {
+        "decile": 6,
+        "predicted": 0.42,
+        "actual": 0.45,
+        "n": 675
+      },
+      {
+        "decile": 7,
+        "predicted": 0.38,
+        "actual": 0.43,
+        "n": 676
+      },
+      {
+        "decile": 8,
+        "predicted": 0.35,
+        "actual": 0.4,
+        "n": 675
+      },
+      {
+        "decile": 9,
+        "predicted": 0.31,
+        "actual": 0.34,
+        "n": 675
+      },
+      {
+        "decile": 10,
+        "predicted": 0.24,
+        "actual": 0.25,
+        "n": 676
+      }
+    ]
+  },
+  "value": {
+    "mean_actual": 233.89,
+    "mae_model": 381.8,
+    "mae_predict_mean": 566.5,
+    "spearman_model": 0.48,
+    "spearman_heuristic": 0.351,
+    "top_decile_model": {
+      "mean_top_decile": 2290.86,
+      "mean_all": 233.89,
+      "lift": 9.79,
+      "share_of_total": 0.98
+    },
+    "top_decile_heuristic": {
+      "mean_top_decile": 2287.47,
+      "mean_all": 233.89,
+      "lift": 9.78,
+      "share_of_total": 0.979
+    },
+    "deciles": [
+      {
+        "decile": 1,
+        "predicted": 1374.95,
+        "actual": 2290.86,
+        "n": 676
+      },
+      {
+        "decile": 2,
+        "predicted": 162.45,
+        "actual": 323.06,
+        "n": 675
+      },
+      {
+        "decile": 3,
+        "predicted": 32.31,
+        "actual": 107.72,
+        "n": 675
+      },
+      {
+        "decile": 4,
+        "predicted": -21.39,
+        "actual": 19.16,
+        "n": 676
+      },
+      {
+        "decile": 5,
+        "predicted": -40.9,
+        "actual": -30.25,
+        "n": 675
+      },
+      {
+        "decile": 6,
+        "predicted": -52.19,
+        "actual": -49.59,
+        "n": 675
+      },
+      {
+        "decile": 7,
+        "predicted": -53.63,
+        "actual": -61.74,
+        "n": 676
+      },
+      {
+        "decile": 8,
+        "predicted": -53.63,
+        "actual": -63.36,
+        "n": 675
+      },
+      {
+        "decile": 9,
+        "predicted": -54.5,
+        "actual": -71.24,
+        "n": 675
+      },
+      {
+        "decile": 10,
+        "predicted": -71.86,
+        "actual": -127.48,
+        "n": 676
+      }
+    ],
+    "importance": [
+      {
+        "feature": "Handle, first 14 days",
+        "importance": 0.2301
+      },
+      {
+        "feature": "GGR, first 14 days",
+        "importance": 0.1505
+      },
+      {
+        "feature": "Biggest single-day handle",
+        "importance": 0.0557
+      },
+      {
+        "feature": "State",
+        "importance": 0.0133
+      },
+      {
+        "feature": "Welcome offer",
+        "importance": 0.0011
+      },
+      {
+        "feature": "Active days, first 14",
+        "importance": 0.0001
+      },
+      {
+        "feature": "Signup month",
+        "importance": 0.0
+      },
+      {
+        "feature": "Bets, first 14 days",
+        "importance": -0.0
+      },
+      {
+        "feature": "Days idle at day 14",
+        "importance": -0.0006
+      },
+      {
+        "feature": "Welcome promo cost",
+        "importance": -0.0014
+      }
+    ],
+    "hidden_high_value_share_top_decile": 0.624,
+    "hidden_high_value_share_all": 0.1,
+    "hidden_bonus_hunter_share_bottom_half": 0.348,
+    "hidden_bonus_hunter_share_all": 0.21
+  }
+}

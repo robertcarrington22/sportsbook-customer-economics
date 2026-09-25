@@ -1,0 +1,171 @@
+# Every number the simulator uses lives in this file.
+# None of it is DraftKings data. Values are illustrative, chosen to be in a
+# plausible range for a US online sportsbook, and are meant to be argued with.
+# Change a number here, re-run `python run.py`, and every table, model, and
+# chart downstream updates.
+
+[simulation]
+seed = 42
+n_ftds = 40000                 # first-time depositors (the unit CAC is paid on)
+signup_start = "2024-09-01"
+signup_end = "2025-08-31"
+observation_end = "2026-06-30" # every cohort gets at least ~10 months of history
+
+# Relative signup volume by calendar month (1 = January).
+[simulation.signup_seasonality]
+1 = 1.3    # NFL playoffs
+2 = 1.4    # Super Bowl
+3 = 1.3    # March Madness
+4 = 0.6
+5 = 0.5
+6 = 0.45
+7 = 0.4
+8 = 0.8    # preseason
+9 = 2.2    # NFL kickoff
+10 = 1.5
+11 = 1.3
+12 = 1.2
+
+# Multiplier on a player's chance of betting on a given day, by calendar month.
+[simulation.activity_seasonality]
+1 = 1.3
+2 = 1.15
+3 = 1.2
+4 = 0.8
+5 = 0.7
+6 = 0.65
+7 = 0.6
+8 = 0.75
+9 = 1.35
+10 = 1.3
+11 = 1.3
+12 = 1.3
+
+[economics]
+# Payments, data feeds, trading/risk, platform fees, as a share of handle.
+variable_cost_pct_handle = 0.006
+
+# ---------------------------------------------------------------------------
+# Acquisition channels. `cac` is the blended cost per FTD. `type_mix` is the
+# hidden share of each player type the channel brings in. The analysis never
+# sees player type; it only sees behavior.
+# ---------------------------------------------------------------------------
+[channels.paid_social]
+share = 0.28
+cac = 310
+type_mix = { bonus_hunter = 0.22, casual = 0.50, regular = 0.22, high_value = 0.06 }
+
+[channels.search]
+share = 0.20
+cac = 390
+type_mix = { bonus_hunter = 0.12, casual = 0.42, regular = 0.34, high_value = 0.12 }
+
+[channels.affiliate]
+share = 0.22
+cac = 450
+type_mix = { bonus_hunter = 0.30, casual = 0.30, regular = 0.28, high_value = 0.12 }
+
+[channels.tv_brand]
+share = 0.18
+cac = 220
+type_mix = { bonus_hunter = 0.08, casual = 0.52, regular = 0.32, high_value = 0.08 }
+
+[channels.referral]
+share = 0.12
+cac = 160
+type_mix = { bonus_hunter = 0.10, casual = 0.38, regular = 0.40, high_value = 0.12 }
+
+# ---------------------------------------------------------------------------
+# Welcome offers. `expected_cost` is the operator's expected cost of the offer
+# per FTD. `type_tilt` multiplies the channel's type mix (then renormalized):
+# rich no-strings offers pull in more bonus hunters.
+# ---------------------------------------------------------------------------
+[offers.bet5_get200]
+share = 0.50
+expected_cost = 150
+type_tilt = { bonus_hunter = 1.6 }
+
+[offers.no_sweat_1000]
+share = 0.30
+expected_cost = 95
+type_tilt = { high_value = 1.4, regular = 1.1 }
+
+[offers.deposit_match_250]
+share = 0.20
+expected_cost = 70
+type_tilt = { casual = 1.1 }
+
+# ---------------------------------------------------------------------------
+# States. Tax is applied to net gaming revenue (GGR minus promos) as a
+# simplification. Rates are illustrative approximations; several states use
+# tiered or per-wager structures that this ignores.
+# ---------------------------------------------------------------------------
+[states]
+NY = { share = 0.20, tax_rate = 0.51 }
+NJ = { share = 0.12, tax_rate = 0.1975 }
+PA = { share = 0.12, tax_rate = 0.36 }
+IL = { share = 0.12, tax_rate = 0.25 }
+MA = { share = 0.08, tax_rate = 0.20 }
+OH = { share = 0.10, tax_rate = 0.20 }
+MI = { share = 0.08, tax_rate = 0.084 }
+AZ = { share = 0.08, tax_rate = 0.10 }
+CO = { share = 0.10, tax_rate = 0.10 }
+
+# ---------------------------------------------------------------------------
+# Hidden player types. Behavior parameters:
+#   early_exit_prob  chance the player is gone within 30 days
+#   monthly_churn    churn hazard after the first month
+#   p_active         base chance of betting on any given day while retained
+#   bets_per_day     mean bets on an active day
+#   stake_median     median stake per bet ($); stake_sigma is player-level spread
+#   win_prob, decimal_odds  set the book's hold: 1 - win_prob * decimal_odds
+#   reinvest_pct     ongoing promos (boosts, bonus bets) as a share of expected GGR
+#   promo_use        how much of the welcome offer's expected cost they extract
+# ---------------------------------------------------------------------------
+[types.bonus_hunter]
+early_exit_prob = 0.65
+monthly_churn = 0.20
+p_active = 0.10
+bets_per_day = 1.5
+stake_median = 10
+stake_sigma = 0.6
+win_prob = 0.46
+decimal_odds = 1.98
+reinvest_pct = 0.05
+promo_use = 1.15
+
+[types.casual]
+early_exit_prob = 0.35
+monthly_churn = 0.14
+p_active = 0.07
+bets_per_day = 2.0
+stake_median = 15
+stake_sigma = 0.8
+win_prob = 0.24
+decimal_odds = 3.8
+reinvest_pct = 0.10
+promo_use = 0.80
+
+[types.regular]
+early_exit_prob = 0.12
+monthly_churn = 0.07
+p_active = 0.22
+bets_per_day = 3.5
+stake_median = 30
+stake_sigma = 0.8
+win_prob = 0.38
+decimal_odds = 2.35
+reinvest_pct = 0.15
+promo_use = 1.00
+
+[types.high_value]
+early_exit_prob = 0.05
+monthly_churn = 0.035
+p_active = 0.40
+bets_per_day = 6.0
+stake_median = 100
+stake_sigma = 1.0
+win_prob = 0.48
+decimal_odds = 1.95
+reinvest_pct = 0.20
+promo_use = 1.00

@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sportsbook Customer Economics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.35.3/plotly.min.js"></script>
+<style>
+:root{
+  --ground:#F3F4F1; --card:#FFFFFF; --ink:#121A21; --ink-2:#48525C; --ink-3:#7D8790;
+  --line:#D8DCD6; --line-2:#E8EBE6;
+  --win:#16794C; --win-soft:#DDF0E6; --loss:#B23A2E; --loss-soft:#F7E0DC; --accent:#1D4E89;
+  --mono:'JetBrains Mono',ui-monospace,Menlo,monospace;
+  --body:'Source Sans 3',system-ui,-apple-system,Segoe UI,sans-serif;
+  --disp:'Archivo',var(--body);
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.55}
+.wrap{max-width:1080px;margin:0 auto;padding-inline:20px;padding-block:44px 80px}
+header{border-bottom:2px solid var(--ink);padding-bottom:26px}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+h1{font-family:var(--disp);font-weight:800;font-size:clamp(34px,5.4vw,58px);line-height:1;letter-spacing:-.02em;margin:10px 0 14px}
+.lede{font-size:19px;color:var(--ink-2);max-width:66ch;margin:0}
+.note{margin-top:16px;font-size:14.5px;color:var(--ink-2);background:var(--card);border:1px solid var(--line);border-left:4px solid var(--accent);padding:10px 14px;max-width:80ch}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin:28px 0 8px}
+.kpi{background:var(--card);padding:16px 18px}
+.kpi .v{font-family:var(--disp);font-weight:800;font-size:34px;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.05}
+.kpi .l{font-size:13.5px;color:var(--ink-2);margin-top:4px}
+section{padding-block:38px;border-bottom:1px solid var(--line)}
+h2{font-family:var(--disp);font-weight:800;font-size:clamp(24px,3vw,32px);letter-spacing:-.015em;margin:0 0 6px}
+h2 small{display:block;font-family:var(--mono);font-size:12px;font-weight:400;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin-bottom:8px}
+.sub{color:var(--ink-2);max-width:70ch;margin:0 0 18px}
+.findings{list-style:none;padding:0;margin:0;display:grid;gap:12px}
+.findings li{background:var(--card);border:1px solid var(--line);padding:14px 18px;display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start}
+.findings .n{font-family:var(--mono);font-size:13px;color:var(--ink-3);padding-top:3px}
+.findings b{font-weight:600}
+.chart{background:var(--card);border:1px solid var(--line);padding:8px 6px 2px;margin:14px 0}
+.tbl{overflow-x:auto;background:var(--card);border:1px solid var(--line);margin:14px 0}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:15px}
+th,td{padding:9px 14px;text-align:right;border-bottom:1px solid var(--line-2);font-variant-numeric:tabular-nums}
+th:first-child,td:first-child{text-align:left}
+th{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);font-weight:500;background:#FAFBF9}
+tr:last-child td{border-bottom:0}
+.pos{color:var(--win)} .neg{color:var(--loss)}
+.pill{display:inline-block;font-family:var(--mono);font-size:12px;padding:1px 8px;border-radius:999px}
+.pill.pos{background:var(--win-soft)} .pill.neg{background:var(--loss-soft)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media (max-width:760px){.two{grid-template-columns:1fr}}
+.sim{background:var(--card);border:1px solid var(--line);padding:18px}
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:10px}
+label{display:block;font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin-bottom:4px}
+select,input[type=range]{width:100%;font:inherit;font-size:15px}
+select{padding:6px 8px;border:1px solid var(--line);background:var(--ground);color:var(--ink)}
+input[type=range]{accent-color:var(--accent)}
+.out{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin:8px 0 4px}
+.out div{background:var(--ground);padding:10px 14px}
+.out .v{font-family:var(--disp);font-weight:800;font-size:26px;font-variant-numeric:tabular-nums}
+.out .l{font-size:13px;color:var(--ink-2)}
+.caveats{columns:2 320px;column-gap:28px;font-size:15px;color:var(--ink-2)}
+.caveats p{break-inside:avoid;margin:0 0 12px}
+code{font-family:var(--mono);font-size:.88em;background:var(--line-2);padding:1px 5px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div class="eyebrow">Customer economics · simulated US sportsbook · Robert Carrington</div>
+  <h1>What is a new depositor worth?</h1>
+  <p class="lede">Acquisition cost, twelve-month contribution, payback by channel, the price of welcome offers, the effect of state tax, and a model that estimates a player's value from their first two weeks.</p>
+  <p class="note"><b>The data is simulated.</b> No real operator data is used. Every assumption, from channel costs to hold rates, lives in one file, <code>assumptions.toml</code>. The SQL and models are written to run unchanged on real FTD and bet-level tables. The findings show the method, not DraftKings' actual economics.</p>
+  <div class="kpis" id="kpis"></div>
+</header>
+
+<section>
+  <h2><small>Memo</small>Four findings</h2>
+  <ul class="findings" id="findings"></ul>
+</section>
+
+<section>
+  <h2><small>Channels</small>Payback by acquisition channel</h2>
+  <p class="sub">Cumulative contribution per FTD after promos, gaming tax, and variable cost. The dashed line is the channel's cost to acquire. Payback is where the solid line crosses it.</p>
+  <div class="chart" id="c-curves"></div>
+  <div class="tbl"><table id="t-channels"></table></div>
+</section>
+
+<section>
+  <h2><small>Offers and tax</small>Two levers that move value before the player places a bet</h2>
+  <div class="two">
+    <div>
+      <p class="sub">The richest welcome offer costs the most and brings the weakest players.</p>
+      <div class="chart" id="c-offers"></div>
+    </div>
+    <div>
+      <p class="sub">The same betting behavior is worth half as much in a 51% tax state.</p>
+      <div class="chart" id="c-states"></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2><small>Retention</small>Share of each cohort still betting</h2>
+  <p class="sub">Each row is a monthly signup cohort. Each column is a 30-day month since first deposit. Blank cells have not happened yet.</p>
+  <div class="chart" id="c-heat"></div>
+</section>
+
+<section>
+  <h2><small>Model</small>Estimating value from the first 14 days</h2>
+  <p class="sub" id="model-sub"></p>
+  <div class="two">
+    <div class="chart" id="c-deciles"></div>
+    <div class="chart" id="c-importance"></div>
+  </div>
+  <div class="tbl"><table id="t-model"></table></div>
+</section>
+
+<section>
+  <h2><small>Tool</small>CAC payback simulator</h2>
+  <p class="sub">Pick a channel, offer, and state, then move the acquisition cost. Contribution applies that state's tax rate to the simulated net gaming revenue.</p>
+  <div class="sim">
+    <div class="controls">
+      <div><label for="s-channel">Channel</label><select id="s-channel"></select></div>
+      <div><label for="s-offer">Welcome offer</label><select id="s-offer"></select></div>
+      <div><label for="s-state">State</label><select id="s-state"></select></div>
+      <div><label for="s-cac">CAC per FTD: <span id="s-cac-v"></span></label><input type="range" id="s-cac" min="50" max="900" step="10"></div>
+    </div>
+    <div class="out" id="s-out"></div>
+    <div id="c-sim"></div>
+  </div>
+</section>
+
+<section>
+  <h2><small>Method</small>How it's built, and what it doesn't know</h2>
+  <div class="caveats">
+    <p><b>Pipeline.</b> <code>simulate.py</code> generates 40,000 first-time depositors and every day they bet. <code>sql/</code> builds a player-month fact table in DuckDB and derives retention, LTV curves, and channel, offer, and state economics. <code>model.py</code> trains on Sep 2024 to Apr 2025 cohorts and tests on May to Aug 2025, an out-of-time split.</p>
+    <p><b>Contribution</b> is gross gaming revenue, minus welcome and ongoing promos, minus gaming tax on the remainder, minus variable cost at 0.6% of handle. It excludes fixed costs, brand spend, and overhead.</p>
+    <p><b>Censoring.</b> Every curve and 12-month figure uses only players with 12 full months of history, so younger cohorts never drag an average down.</p>
+    <p><b>Simplifications.</b> Tax is a flat rate on net revenue, though several states tier it or tax per wager. No casino or daily fantasy cross-sell. Players never return after churning.</p>
+    <p><b>Validation.</b> Because the data is simulated, each player's hidden type is known. The analysis never uses it. It is only used to check that the value model finds the players it should.</p>
+    <p><b>Next.</b> Model log value to fix the low bias on the top decile. Add reactivation and cross-sell. Point the SQL at real tables.</p>
+  </div>
+</section>
+</div>
+
+<script>
+const D = {"kpi": {"ftds": 40000, "blended_cac": 323, "blended_ltv": 423, "ltv_to_cac": 1.31, "net_negative_180": 0.67}, "channels": [{"channel": "referral", "ftds": 4379, "cac": 160.0, "ltv_12m": 541.0, "median_ltv_12m": -28.0, "ltv_to_cac": 3.37, "active_m3_rate": 0.615, "top_decile_share_of_value": 1.013, "payback_month": 3.0}, {"channel": "tv_brand", "ftds": 6551, "cac": 220.0, "ltv_12m": 372.0, "median_ltv_12m": -37.0, "ltv_to_cac": 1.69, "active_m3_rate": 0.575, "top_decile_share_of_value": 1.095, "payback_month": 7.0}, {"channel": "search", "ftds": 7287, "cac": 390.0, "ltv_12m": 518.0, "median_ltv_12m": -35.0, "ltv_to_cac": 1.33, "active_m3_rate": 0.594, "top_decile_share_of_value": 1.002, "payback_month": 8.0}, {"channel": "affiliate", "ftds": 8101, "cac": 452.0, "ltv_12m": 486.0, "median_ltv_12m": -55.0, "ltv_to_cac": 1.08, "active_m3_rate": 0.519, "top_decile_share_of_value": 1.098, "payback_month": 10.0}, {"channel": "paid_social", "ftds": 10139, "cac": 310.0, "ltv_12m": 285.0, "median_ltv_12m": -52.0, "ltv_to_cac": 0.92, "active_m3_rate": 0.496, "top_decile_share_of_value": 1.213, "payback_month": -1.0}], "offers": [{"offer": "no_sweat_1000", "ftds": 10937, "welcome_cost_per_ftd": 90.0, "active_m3_rate": 0.582, "ltv_12m": 514.0, "ltv_to_cac": 1.59}, {"offer": "deposit_match_250", "ftds": 7314, "welcome_cost_per_ftd": 65.0, "active_m3_rate": 0.55, "ltv_12m": 458.0, "ltv_to_cac": 1.42}, {"offer": "bet5_get200", "ftds": 18206, "welcome_cost_per_ftd": 144.0, "active_m3_rate": 0.529, "ltv_12m": 353.0, "ltv_to_cac": 1.09}], "states": [{"state": "NY", "tax_rate": 0.51, "ftds": 7330, "ggr_per_ftd": 951.0, "ngr_per_ftd": 660.0, "tax_per_ftd": 336.0, "contribution_per_ftd": 242.0, "ltv_to_cac": 0.75, "breakeven_ngr_per_ftd": 823.0}, {"state": "PA", "tax_rate": 0.36, "ftds": 4345, "ggr_per_ftd": 1015.0, "ngr_per_ftd": 721.0, "tax_per_ftd": 260.0, "contribution_per_ftd": 379.0, "ltv_to_cac": 1.18, "breakeven_ngr_per_ftd": 632.0}, {"state": "IL", "tax_rate": 0.25, "ftds": 4401, "ggr_per_ftd": 990.0, "ngr_per_ftd": 698.0, "tax_per_ftd": 174.0, "contribution_per_ftd": 441.0, "ltv_to_cac": 1.36, "breakeven_ngr_per_ftd": 540.0}, {"state": "OH", "tax_rate": 0.2, "ftds": 3628, "ggr_per_ftd": 1024.0, "ngr_per_ftd": 716.0, "tax_per_ftd": 143.0, "contribution_per_ftd": 484.0, "ltv_to_cac": 1.49, "breakeven_ngr_per_ftd": 517.0}, {"state": "MA", "tax_rate": 0.2, "ftds": 2881, "ggr_per_ftd": 947.0, "ngr_per_ftd": 661.0, "tax_per_ftd": 132.0, "contribution_per_ftd": 450.0, "ltv_to_cac": 1.38, "breakeven_ngr_per_ftd": 505.0}, {"state": "NJ", "tax_rate": 0.1975, "ftds": 4383, "ggr_per_ftd": 1040.0, "ngr_per_ftd": 747.0, "tax_per_ftd": 148.0, "contribution_per_ftd": 517.0, "ltv_to_cac": 1.6, "breakeven_ngr_per_ftd": 507.0}, {"state": "AZ", "tax_rate": 0.1, "ftds": 2949, "ggr_per_ftd": 948.0, "ngr_per_ftd": 660.0, "tax_per_ftd": 66.0, "contribution_per_ftd": 514.0, "ltv_to_cac": 1.6, "breakeven_ngr_per_ftd": 445.0}, {"state": "CO", "tax_rate": 0.1, "ftds": 3647, "ggr_per_ftd": 868.0, "ngr_per_ftd": 597.0, "tax_per_ftd": 60.0, "contribution_per_ftd": 465.0, "ltv_to_cac": 1.44, "breakeven_ngr_per_ftd": 440.0}, {"state": "MI", "tax_rate": 0.084, "ftds": 2893, "ggr_per_ftd": 943.0, "ngr_per_ftd": 655.0, "tax_per_ftd": 55.0, "contribution_per_ftd": 520.0, "ltv_to_cac": 1.62, "breakeven_ngr_per_ftd": 438.0}], "curves": {"affiliate": [-11.25, 41.13, 103.08, 153.39, 201.6, 242.57, 283.05, 331.33, 370.62, 416.5, 452.41, 485.52], "paid_social": [-37.2, -0.21, 38.71, 64.81, 90.15, 119.56, 146.13, 180.1, 206.59, 229.86, 259.05, 284.87], "referral": [2.72, 72.76, 123.8, 177.31, 236.12, 271.18, 319.86, 364.07, 403.93, 454.24, 510.42, 540.64], "search": [15.98, 80.23, 136.01, 187.64, 237.2, 279.43, 325.1, 369.67, 402.73, 445.63, 472.93, 517.96], "tv_brand": [-20.72, 24.74, 66.67, 106.1, 145.98, 175.8, 210.28, 238.45, 269.59, 301.28, 333.53, 371.58]}, "curve_cac": {"affiliate": 451.54, "paid_social": 309.64, "referral": 160.35, "search": 389.54, "tv_brand": 219.51}, "heat": {"cohorts": ["Sep 2024", "Oct 2024", "Nov 2024", "Dec 2024", "Jan 2025", "Feb 2025", "Mar 2025", "Apr 2025", "May 2025", "Jun 2025", "Jul 2025", "Aug 2025"], "months": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22], "z": [[1.0, 0.636, 0.567, 0.5, 0.454, 0.407, 0.36, 0.314, 0.283, 0.258, 0.237, 0.228, 0.215, 0.196, 0.183, 0.172, 0.16, 0.148, 0.138, 0.128, 0.118, 0.11], [1.0, 0.63, 0.563, 0.5, 0.449, 0.408, 0.351, 0.312, 0.274, 0.252, 0.247, 0.235, 0.217, 0.201, 0.182, 0.168, 0.157, 0.141, 0.125, 0.114, 0.11, null], [1.0, 0.647, 0.573, 0.504, 0.451, 0.394, 0.35, 0.321, 0.29, 0.277, 0.266, 0.242, 0.222, 0.204, 0.186, 0.175, 0.165, 0.147, 0.135, 0.13, null, null], [1.0, 0.635, 0.567, 0.497, 0.429, 0.381, 0.344, 0.314, 0.3, 0.283, 0.258, 0.235, 0.22, 0.205, 0.189, 0.178, 0.163, 0.149, 0.145, null, null, null], [1.0, 0.622, 0.556, 0.476, 0.421, 0.384, 0.353, 0.337, 0.319, 0.296, 0.269, 0.245, 0.225, 0.206, 0.191, 0.173, 0.16, 0.139, null, null, null, null], [1.0, 0.624, 0.538, 0.472, 0.418, 0.389, 0.375, 0.357, 0.32, 0.294, 0.274, 0.252, 0.229, 0.207, 0.192, 0.175, 0.164, null, null, null, null, null], [1.0, 0.582, 0.509, 0.452, 0.424, 0.409, 0.379, 0.341, 0.312, 0.281, 0.255, 0.233, 0.213, 0.191, 0.175, 0.141, null, null, null, null, null, null], [1.0, 0.573, 0.506, 0.472, 0.451, 0.422, 0.392, 0.358, 0.329, 0.3, 0.275, 0.251, 0.227, 0.203, 0.189, null, null, null, null, null, null, null], [1.0, 0.562, 0.505, 0.48, 0.449, 0.412, 0.366, 0.334, 0.301, 0.272, 0.255, 0.221, 0.204, 0.209, null, null, null, null, null, null, null, null], [1.0, 0.557, 0.539, 0.497, 0.439, 0.391, 0.357, 0.318, 0.277, 0.254, 0.219, 0.197, 0.169, null, null, null, null, null, null, null, null, null], [1.0, 0.598, 0.57, 0.512, 0.464, 0.416, 0.376, 0.352, 0.322, 0.287, 0.254, 0.234, null, null, null, null, null, null, null, null, null, null], [1.0, 0.629, 0.567, 0.503, 0.454, 0.402, 0.365, 0.33, 0.294, 0.271, 0.265, null, null, null, null, null, null, null, null, null, null, null]]}, "model": {"split": {"train_cohorts": "Sep 2024 to Apr 2025", "test_cohorts": "May 2025 to Aug 2025", "n_train": 33246, "n_test": 6754}, "retention": {"base_rate_active_m3": 0.547, "auc_logistic": 0.739, "auc_gbm": 0.741, "avg_precision_gbm": 0.784, "lapse_rate_bottom_decile": 0.753, "lapse_rate_all": 0.453, "deciles": [{"decile": 1, "predicted": 0.89, "actual": 0.91, "n": 676}, {"decile": 2, "predicted": 0.82, "actual": 0.84, "n": 675}, {"decile": 3, "predicted": 0.69, "actual": 0.77, "n": 675}, {"decile": 4, "predicted": 0.55, "actual": 0.58, "n": 676}, {"decile": 5, "predicted": 0.47, "actual": 0.51, "n": 675}, {"decile": 6, "predicted": 0.42, "actual": 0.45, "n": 675}, {"decile": 7, "predicted": 0.38, "actual": 0.43, "n": 676}, {"decile": 8, "predicted": 0.35, "actual": 0.4, "n": 675}, {"decile": 9, "predicted": 0.31, "actual": 0.34, "n": 675}, {"decile": 10, "predicted": 0.24, "actual": 0.25, "n": 676}]}, "value": {"mean_actual": 233.89, "mae_model": 381.8, "mae_predict_mean": 566.5, "spearman_model": 0.48, "spearman_heuristic": 0.351, "top_decile_model": {"mean_top_decile": 2290.86, "mean_all": 233.89, "lift": 9.79, "share_of_total": 0.98}, "top_decile_heuristic": {"mean_top_decile": 2287.47, "mean_all": 233.89, "lift": 9.78, "share_of_total": 0.979}, "deciles": [{"decile": 1, "predicted": 1374.95, "actual": 2290.86, "n": 676}, {"decile": 2, "predicted": 162.45, "actual": 323.06, "n": 675}, {"decile": 3, "predicted": 32.31, "actual": 107.72, "n": 675}, {"decile": 4, "predicted": -21.39, "actual": 19.16, "n": 676}, {"decile": 5, "predicted": -40.9, "actual": -30.25, "n": 675}, {"decile": 6, "predicted": -52.19, "actual": -49.59, "n": 675}, {"decile": 7, "predicted": -53.63, "actual": -61.74, "n": 676}, {"decile": 8, "predicted": -53.63, "actual": -63.36, "n": 675}, {"decile": 9, "predicted": -54.5, "actual": -71.24, "n": 675}, {"decile": 10, "predicted": -71.86, "actual": -127.48, "n": 676}], "importance": [{"feature": "Handle, first 14 days", "importance": 0.2301}, {"feature": "GGR, first 14 days", "importance": 0.1505}, {"feature": "Biggest single-day handle", "importance": 0.0557}, {"feature": "State", "importance": 0.0133}, {"feature": "Welcome offer", "importance": 0.0011}, {"feature": "Active days, first 14", "importance": 0.0001}, {"feature": "Signup month", "importance": 0.0}, {"feature": "Bets, first 14 days", "importance": -0.0}, {"feature": "Days idle at day 14", "importance": -0.0006}, {"feature": "Welcome promo cost", "importance": -0.0014}], "hidden_high_value_share_top_decile": 0.624, "hidden_high_value_share_all": 0.1, "hidden_bonus_hunter_share_bottom_half": 0.348, "hidden_bonus_hunter_share_all": 0.21}}, "sim": {"affiliate": {"all": {"ngr": [3.14, 85.03, 95.73, 77.29, 75.95, 66.02, 63.51, 73.33, 63.77, 69.98, 57.51, 54.98], "var": [12.07, 10.13, 9.2, 8.15, 7.79, 7.28, 7.08, 7.14, 7.03, 7.15, 7.11, 7.12], "cac": 452.0, "ftds": 8101}, "bet5_get200": {"ngr": [-49.73, 66.05, 86.48, 68.95, 58.28, 54.48, 58.84, 55.32, 59.08, 46.96, 42.8, 55.55], "var": [11.12, 9.19, 8.43, 7.35, 6.74, 6.31, 6.16, 6.17, 6.01, 5.82, 6.19, 6.09], "cac": 453.0, "ftds": 3994}, "deposit_match_250": {"ngr": [45.58, 91.36, 69.78, 91.62, 59.11, 52.76, 57.56, 81.59, 46.5, 105.75, 71.62, 48.59], "var": [11.23, 9.43, 8.49, 7.87, 7.41, 7.18, 7.34, 7.4, 7.57, 7.5, 7.2, 6.98], "cac": 448.0, "ftds": 1637}, "no_sweat_1000": {"ngr": [60.52, 111.54, 127.87, 81.28, 115.68, 93.47, 74.99, 96.97, 82.79, 83.51, 71.94, 58.28], "var": [14.16, 12.1, 10.91, 9.64, 9.75, 8.92, 8.41, 8.53, 8.33, 9.08, 8.54, 8.88], "cac": 452.0, "ftds": 2470}}, "paid_social": {"all": {"ngr": [-39.71, 58.5, 59.44, 42.86, 40.74, 44.36, 42.81, 50.18, 43.02, 36.71, 44.01, 37.58], "var": [6.93, 5.72, 5.23, 4.96, 4.56, 4.21, 4.1, 3.97, 4.13, 4.06, 4.05, 4.19], "cac": 310.0, "ftds": 10139}, "bet5_get200": {"ngr": [-93.04, 53.72, 48.4, 40.69, 28.77, 43.54, 37.32, 47.49, 31.92, 24.95, 43.29, 36.72], "var": [6.15, 4.99, 4.47, 4.37, 4.13, 3.76, 3.66, 3.61, 3.67, 3.76, 3.53, 3.8], "cac": 309.0, "ftds": 5138}, "deposit_match_250": {"ngr": [4.4, 57.09, 59.54, 45.43, 63.17, 51.81, 55.11, 45.13, 57.27, 52.12, 44.13, 19.61], "var": [6.66, 5.29, 4.83, 4.53, 4.0, 3.97, 3.84, 3.77, 4.32, 4.18, 4.12, 3.85], "cac": 311.0, "ftds": 1997}, "no_sweat_1000": {"ngr": [22.18, 67.6, 78.25, 44.85, 46.31, 40.81, 44.04, 58.14, 52.53, 46.59, 45.15, 51.01], "var": [8.45, 7.25, 6.8, 6.26, 5.66, 5.15, 5.02, 4.73, 4.8, 4.49, 4.9, 5.09], "cac": 311.0, "ftds": 3004}}, "referral": {"all": {"ngr": [23.98, 106.04, 82.83, 81.25, 90.21, 55.95, 75.97, 67.66, 64.13, 78.42, 82.14, 50.03], "var": [13.08, 10.66, 9.85, 9.07, 8.04, 7.37, 6.86, 7.05, 6.84, 7.24, 7.37, 7.47], "cac": 160.0, "ftds": 4379}, "bet5_get200": {"ngr": [-14.65, 122.99, 69.27, 62.9, 104.1, 67.27, 65.74, 63.97, 65.27, 80.46, 83.27, 55.22], "var": [12.62, 10.51, 9.58, 8.73, 7.8, 7.3, 6.66, 6.66, 6.26, 7.23, 6.85, 7.1], "cac": 161.0, "ftds": 2164}, "deposit_match_250": {"ngr": [49.16, 88.33, 74.43, 109.48, 83.45, 48.84, 93.46, 13.76, 41.62, 61.28, 47.48, 51.84], "var": [11.88, 8.76, 7.97, 7.48, 6.66, 6.1, 5.9, 5.74, 6.11, 5.99, 6.68, 6.32], "cac": 159.0, "ftds": 876}, "no_sweat_1000": {"ngr": [69.95, 90.23, 110.24, 92.45, 72.2, 42.3, 81.07, 108.88, 77.01, 86.34, 102.99, 40.47], "var": [14.62, 12.15, 11.5, 10.65, 9.34, 8.31, 7.81, 8.55, 8.25, 8.08, 8.67, 8.83], "cac": 160.0, "ftds": 1339}}, "search": {"all": {"ngr": [42.45, 103.8, 88.38, 81.53, 77.53, 68.21, 73.57, 68.13, 58.88, 66.77, 49.65, 71.91], "var": [12.46, 10.44, 9.32, 8.06, 7.53, 7.35, 7.24, 7.23, 7.2, 7.44, 7.24, 7.24], "cac": 390.0, "ftds": 7287}, "bet5_get200": {"ngr": [26.24, 86.34, 63.76, 85.87, 64.45, 68.44, 77.51, 69.99, 54.75, 64.46, 37.35, 73.94], "var": [12.48, 10.44, 9.07, 7.73, 7.17, 7.15, 7.55, 7.21, 7.0, 7.56, 7.29, 7.09], "cac": 389.0, "ftds": 3661}, "deposit_match_250": {"ngr": [73.11, 103.43, 108.53, 62.32, 88.55, 67.67, 68.16, 58.84, 63.93, 61.89, 33.54, 56.36], "var": [10.62, 8.77, 8.2, 6.77, 6.5, 6.16, 6.04, 5.83, 6.4, 6.13, 6.09, 5.92], "cac": 391.0, "ftds": 1468}, "no_sweat_1000": {"ngr": [49.11, 133.67, 116.44, 87.24, 92.21, 68.18, 70.58, 71.3, 62.45, 74.02, 81.49, 79.05], "var": [13.67, 11.59, 10.52, 9.51, 8.85, 8.51, 7.53, 8.22, 8.09, 8.13, 7.93, 8.39], "cac": 389.0, "ftds": 2158}}, "tv_brand": {"all": {"ngr": [-15.58, 71.08, 63.64, 60.46, 59.35, 47.13, 49.76, 44.61, 47.73, 48.53, 51.17, 57.59], "var": [8.54, 7.05, 6.62, 6.04, 5.7, 5.11, 4.85, 4.6, 4.63, 4.44, 4.51, 4.68], "cac": 220.0, "ftds": 6551}, "bet5_get200": {"ngr": [-57.97, 53.16, 67.46, 69.92, 65.0, 35.21, 51.19, 37.73, 52.63, 39.78, 59.13, 44.79], "var": [8.17, 6.87, 6.47, 6.1, 5.65, 5.21, 4.89, 4.42, 4.32, 4.11, 4.2, 4.3], "cac": 220.0, "ftds": 3249}, "deposit_match_250": {"ngr": [55.97, 83.0, 61.08, 68.64, 62.78, 74.19, 42.75, 45.9, 39.63, 75.41, 31.01, 62.91], "var": [8.37, 6.54, 6.52, 5.66, 5.95, 5.16, 4.66, 4.65, 4.76, 4.34, 4.43, 4.44], "cac": 220.0, "ftds": 1336}, "no_sweat_1000": {"ngr": [5.85, 92.6, 59.06, 39.28, 47.68, 48.44, 52.17, 55.11, 45.13, 44.74, 51.71, 75.12], "var": [9.26, 7.68, 6.95, 6.19, 5.6, 4.91, 4.92, 4.86, 5.05, 5.04, 5.09, 5.48], "cac": 219.0, "ftds": 1966}}}, "tax": {"NY": 0.51, "PA": 0.36, "IL": 0.25, "OH": 0.2, "MA": 0.2, "NJ": 0.1975, "AZ": 0.1, "CO": 0.1, "MI": 0.084}, "findings": {"best": "referral", "best_ratio": 3.37, "best_payback": 3, "worst": "paid_social", "worst_ratio": 0.92, "ny_contrib": 242.0, "mi_contrib": 520.0, "ny_ratio": 0.75, "mi_ratio": 1.62, "bet5_cost": 144.0, "bet5_ltv": 353.0, "nosweat_cost": 90.0, "nosweat_ltv": 514.0}};
+const C = {ink:'#121A21', ink2:'#48525C', ink3:'#7D8790', line:'#D8DCD6', win:'#16794C', loss:'#B23A2E', accent:'#1D4E89'};
+const CH_COLORS = {referral:'#16794C', tv_brand:'#1D4E89', search:'#7A5AA6', affiliate:'#C27C0E', paid_social:'#B23A2E'};
+const NAMES = {referral:'Referral', tv_brand:'TV / brand', search:'Search', affiliate:'Affiliate', paid_social:'Paid social',
+  bet5_get200:'Bet $5, get $200', no_sweat_1000:'No-sweat first bet', deposit_match_250:'Deposit match', all:'All offers'};
+const nm = k => NAMES[k] || k;
+const usd = x => (x < 0 ? '−$' : '$') + Math.abs(Math.round(x)).toLocaleString();
+const pct = x => (x * 100).toFixed(0) + '%';
+const base = {font:{family:'Source Sans 3, sans-serif', size:13, color:C.ink2}, paper_bgcolor:'#fff', plot_bgcolor:'#fff',
+  margin:{l:62, r:18, t:18, b:48}, xaxis:{gridcolor:'#EEF0EC', zerolinecolor:C.line, linecolor:C.line},
+  yaxis:{gridcolor:'#EEF0EC', zerolinecolor:'#B9BFB6', linecolor:C.line}, hoverlabel:{font:{family:'JetBrains Mono, monospace', size:12}},
+  legend:{orientation:'h', y:-0.2}};
+const cfg = {displayModeBar:false, responsive:true};
+const L = extra => Object.assign({}, JSON.parse(JSON.stringify(base)), extra);
+
+// KPIs
+const k = D.kpi;
+document.getElementById('kpis').innerHTML = [
+  [k.ftds.toLocaleString(), 'first-time depositors simulated'],
+  [usd(k.blended_cac), 'blended cost per FTD'],
+  [usd(k.blended_ltv), '12-month contribution per FTD'],
+  [k.ltv_to_cac.toFixed(2) + '×', 'blended LTV to CAC, year one'],
+  [pct(k.net_negative_180), 'of FTDs net negative at 180 days'],
+].map(([v,l]) => `<div class="kpi"><div class="v">${v}</div><div class="l">${l}</div></div>`).join('');
+
+// Findings
+const f = D.findings, m = D.model, v = m.value, r = m.retention;
+const items = [
+  `<b>Channel mix matters more than channel cost.</b> ${nm(f.best)} returns ${f.best_ratio.toFixed(2)}× its CAC and pays back in month ${f.best_payback + 1}. ${nm(f.worst)} is one of the cheaper channels per FTD but returns ${f.worst_ratio.toFixed(2)}× and does not pay back inside a year. Cheap FTDs are not cheap if they never bet again.`,
+  `<b>The richest welcome offer is the worst deal.</b> Bet $5, get $200 costs ${usd(f.bet5_cost)} per FTD and its players are worth ${usd(f.bet5_ltv)} over a year. The no-sweat first bet costs ${usd(f.nosweat_cost)} and brings players worth ${usd(f.nosweat_ltv)}. The generous offer attracts bonus hunters who leave once it's spent.`,
+  `<b>Tax rate changes what a player is worth by 2×.</b> The same behavior yields ${usd(f.ny_contrib)} of 12-month contribution in New York at a 51% rate and ${usd(f.mi_contrib)} in Michigan. At a single national CAC, New York returns ${f.ny_ratio.toFixed(2)}× and Michigan ${f.mi_ratio.toFixed(2)}×. Bid caps should be set by state.`,
+  `<b>Two weeks is enough to find most of the value.</b> ${pct(k.net_negative_180)} of depositors are net negative after 180 days, and the top decile carries nearly all of the profit. A model on the first 14 days ranks players better than sorting by handle (rank correlation ${v.spearman_model} vs ${v.spearman_heuristic}), though for picking out the top decile, simple handle does as well. The model's top decile is ${pct(v.hidden_high_value_share_top_decile)} true high-value players, against a ${pct(v.hidden_high_value_share_all)} base rate.`,
+];
+document.getElementById('findings').innerHTML = items.map((t,i) => `<li><span class="n">0${i+1}</span><span>${t}</span></li>`).join('');
+
+// Channel curves
+const months = [...Array(12).keys()].map(i => i + 1);
+const tr = [];
+for (const [c, ys] of Object.entries(D.curves)) {
+  tr.push({x:months, y:ys, name:nm(c), mode:'lines', line:{color:CH_COLORS[c], width:3},
+    hovertemplate:`${nm(c)} · month %{x}<br>%{y:$,.0f} per FTD<extra></extra>`});
+  tr.push({x:[1,12], y:[D.curve_cac[c], D.curve_cac[c]], mode:'lines', line:{color:CH_COLORS[c], width:1.5, dash:'dash'},
+    showlegend:false, hovertemplate:`${nm(c)} CAC %{y:$,.0f}<extra></extra>`});
+}
+Plotly.newPlot('c-curves', tr, L({height:420, xaxis:{...base.xaxis, title:'Month since first deposit', dtick:1},
+  yaxis:{...base.yaxis, title:'Cumulative contribution per FTD', tickprefix:'$'}}), cfg);
+
+document.getElementById('t-channels').innerHTML =
+  '<tr><th>Channel</th><th>FTDs</th><th>CAC</th><th>12-mo LTV</th><th>Median LTV</th><th>LTV / CAC</th><th>Active month 3</th><th>Payback</th></tr>' +
+  D.channels.map(c => `<tr><td>${nm(c.channel)}</td><td>${c.ftds.toLocaleString()}</td><td>${usd(c.cac)}</td><td>${usd(c.ltv_12m)}</td>
+    <td class="${c.median_ltv_12m < 0 ? 'neg' : ''}">${usd(c.median_ltv_12m)}</td>
+    <td><span class="pill ${c.ltv_to_cac >= 1 ? 'pos' : 'neg'}">${c.ltv_to_cac.toFixed(2)}×</span></td>
+    <td>${pct(c.active_m3_rate)}</td><td>${c.payback_month < 0 ? '<span class="neg">not in 12 mo</span>' : 'month ' + (c.payback_month + 1)}</td></tr>`).join('');
+
+// Offers
+const off = D.offers;
+Plotly.newPlot('c-offers', [
+  {x:off.map(o => nm(o.offer)), y:off.map(o => o.welcome_cost_per_ftd), name:'Offer cost per FTD', type:'bar', marker:{color:C.loss},
+   hovertemplate:'%{x}<br>cost %{y:$,.0f}<extra></extra>'},
+  {x:off.map(o => nm(o.offer)), y:off.map(o => o.ltv_12m), name:'12-month contribution per FTD', type:'bar', marker:{color:C.win},
+   hovertemplate:'%{x}<br>12-mo LTV %{y:$,.0f}<extra></extra>'},
+], L({height:340, barmode:'group', yaxis:{...base.yaxis, tickprefix:'$'}}), cfg);
+
+// States
+const st = [...D.states].sort((a,b) => a.tax_rate - b.tax_rate);
+Plotly.newPlot('c-states', [{
+  x:st.map(s => s.state), y:st.map(s => s.contribution_per_ftd), type:'bar',
+  marker:{color:st.map(s => s.tax_rate >= 0.3 ? C.loss : C.accent)},
+  text:st.map(s => pct(s.tax_rate)), textposition:'outside', cliponaxis:false,
+  hovertemplate:'%{x} · tax %{text}<br>%{y:$,.0f} per FTD<extra></extra>'}],
+  L({height:340, showlegend:false, yaxis:{...base.yaxis, title:'12-mo contribution per FTD', tickprefix:'$'},
+     xaxis:{...base.xaxis, title:'State, labeled with tax rate'}}), cfg);
+
+// Heatmap
+Plotly.newPlot('c-heat', [{z:D.heat.z, x:D.heat.months, y:D.heat.cohorts, type:'heatmap',
+  colorscale:[[0,'#F4F6F2'],[0.5,'#7FB89A'],[1,'#0E5A36']], zmin:0, zmax:1, xgap:2, ygap:2,
+  colorbar:{tickformat:'.0%', thickness:12, outlinewidth:0},
+  hovertemplate:'%{y} cohort · month %{x}<br>%{z:.0%} active<extra></extra>'}],
+  L({height:440, margin:{l:80, r:18, t:10, b:48}, xaxis:{...base.xaxis, title:'Month since first deposit', dtick:1},
+     yaxis:{...base.yaxis, autorange:'reversed'}}), cfg);
+
+// Model
+document.getElementById('model-sub').textContent =
+  `Trained on ${m.split.train_cohorts} signups (${m.split.n_train.toLocaleString()} players), tested on ${m.split.test_cohorts} (${m.split.n_test.toLocaleString()}). ` +
+  `Each bar is a tenth of test players, ranked by predicted 180-day contribution.`;
+const dec = v.deciles;
+Plotly.newPlot('c-deciles', [
+  {x:dec.map(d => d.decile), y:dec.map(d => d.actual), type:'bar', name:'Actual', marker:{color:dec.map(d => d.actual < 0 ? C.loss : C.win)},
+   hovertemplate:'decile %{x}<br>actual %{y:$,.0f}<extra></extra>'},
+  {x:dec.map(d => d.decile), y:dec.map(d => d.predicted), mode:'lines+markers', name:'Predicted', line:{color:C.ink, width:2},
+   hovertemplate:'decile %{x}<br>predicted %{y:$,.0f}<extra></extra>'},
+], L({height:360, xaxis:{...base.xaxis, title:'Predicted-value decile (1 = highest)', dtick:1},
+     yaxis:{...base.yaxis, title:'180-day contribution per player', tickprefix:'$'}}), cfg);
+
+const imp = [...v.importance].filter(d => d.importance > 0.001).reverse();
+Plotly.newPlot('c-importance', [{y:imp.map(d => d.feature), x:imp.map(d => d.importance), type:'bar', orientation:'h',
+  marker:{color:C.accent}, hovertemplate:'%{y}<br>%{x:.3f} drop in R²<extra></extra>'}],
+  L({height:360, margin:{l:170, r:18, t:18, b:48}, showlegend:false, xaxis:{...base.xaxis, title:'Permutation importance (drop in R²)'}}), cfg);
+
+const td = v.top_decile_model, th = v.top_decile_heuristic;
+document.getElementById('t-model').innerHTML =
+  '<tr><th>Question</th><th>Metric</th><th>Model</th><th>Baseline</th></tr>' +
+  `<tr><td>Still betting in month 3?</td><td>AUC</td><td>${r.auc_gbm}</td><td>${r.auc_logistic} logistic</td></tr>` +
+  `<tr><td>Flag the at-risk tenth</td><td>Lapse rate in bottom decile</td><td>${pct(r.lapse_rate_bottom_decile)}</td><td>${pct(r.lapse_rate_all)} overall</td></tr>` +
+  `<tr><td>Rank everyone by 180-day value</td><td>Spearman correlation</td><td>${v.spearman_model}</td><td>${v.spearman_heuristic} handle only</td></tr>` +
+  `<tr><td>Find the top tenth</td><td>Lift over average</td><td>${td.lift}×</td><td>${th.lift}× handle only</td></tr>` +
+  `<tr><td>Predict dollar value</td><td>Mean absolute error</td><td>${usd(v.mae_model)}</td><td>${usd(v.mae_predict_mean)} predict the mean</td></tr>` +
+  `<tr><td>Recover hidden whales</td><td>High-value share, top decile</td><td>${pct(v.hidden_high_value_share_top_decile)}</td><td>${pct(v.hidden_high_value_share_all)} base rate</td></tr>`;
+
+// Simulator
+const sc = document.getElementById('s-channel'), so = document.getElementById('s-offer'),
+      ss = document.getElementById('s-state'), sr = document.getElementById('s-cac');
+Object.keys(D.sim).forEach(c => sc.add(new Option(nm(c), c)));
+['all','bet5_get200','no_sweat_1000','deposit_match_250'].forEach(o => so.add(new Option(nm(o), o)));
+Object.entries(D.tax).sort((a,b) => a[1] - b[1]).forEach(([s,t]) => ss.add(new Option(`${s} · ${pct(t)} tax`, s)));
+sc.value = 'paid_social'; so.value = 'all'; ss.value = 'NY';
+function setDefaultCac(){ sr.value = D.sim[sc.value][so.value].cac; }
+function runSim(){
+  const d = D.sim[sc.value][so.value], tax = D.tax[ss.value], cac = +sr.value;
+  document.getElementById('s-cac-v').textContent = usd(cac);
+  let cum = 0, pay = -1; const ys = [];
+  d.ngr.forEach((n, i) => { cum += n * (1 - tax) - d.var[i]; ys.push(cum); if (pay < 0 && cum >= cac) pay = i; });
+  const ltv = ys[ys.length - 1];
+  document.getElementById('s-out').innerHTML = [
+    [usd(ltv), '12-month contribution per FTD'],
+    [(ltv / cac).toFixed(2) + '×', 'LTV to CAC'],
+    [pay < 0 ? 'none' : 'month ' + (pay + 1), 'payback'],
+    [usd(Math.max(0, ltv)), 'break-even CAC'],
+  ].map(([v,l]) => `<div><div class="v ${l === 'LTV to CAC' ? (ltv >= cac ? 'pos' : 'neg') : ''}">${v}</div><div class="l">${l}</div></div>`).join('');
+  Plotly.react('c-sim', [
+    {x:months, y:ys, mode:'lines+markers', name:'Cumulative contribution', line:{color:C.win, width:3},
+     hovertemplate:'month %{x}<br>%{y:$,.0f}<extra></extra>'},
+    {x:[1,12], y:[cac,cac], mode:'lines', name:'CAC', line:{color:C.loss, dash:'dash', width:2}, hovertemplate:'CAC %{y:$,.0f}<extra></extra>'},
+  ], L({height:340, xaxis:{...base.xaxis, title:'Month since first deposit', dtick:1},
+        yaxis:{...base.yaxis, tickprefix:'$'}}), cfg);
+}
+sc.onchange = so.onchange = () => { setDefaultCac(); runSim(); };
+ss.onchange = sr.oninput = runSim;
+setDefaultCac(); runSim();
+</script>
+</body>
+</html>
