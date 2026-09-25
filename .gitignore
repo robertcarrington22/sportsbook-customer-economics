@@ -5,3 +5,4 @@ outputs/features.parquet
 run.log
 tabpfn.log
 tabpfn.err
+_preview.html
